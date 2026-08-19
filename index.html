@@ -328,10 +328,53 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div id="impOut" style="margin-top:14px"></div>
 </div></section>
 
+
+<section class="screen" id="s-tasks"><div class="wrap">
+  <div class="eyebrow">Tugas picking</div>
+  <div class="hint">Tugas dari upload RK. Status DRAFT bisa direvisi; stock baru dipotong saat dieksekusi.</div>
+  <div id="taskOut"></div>
+</div></section>
+<section class="screen" id="s-task"><div class="wrap">
+  <div class="eyebrow">Detail tugas picking</div>
+  <div id="taskDetail"></div>
+  <button class="btn ghost" style="margin-top:10px" onclick="go('tasks')">← Kembali ke daftar tugas</button>
+</div></section>
+
+
+<section class="screen" id="s-transfer"><div class="wrap">
+  <div class="eyebrow">Pindah lokasi barang</div>
+  <div class="hint">Cari barangnya dulu, pilih kavling asal, lalu tentukan kavling tujuan. Sistem cek stock &amp; kapasitas.</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Material</label><input id="tfMat" placeholder="AGT602501R"></div>
+      <div style="max-width:120px"><label>Seri (opsional)</label><input id="tfBatch" placeholder="S12S"></div>
+    </div>
+    <button class="btn" id="tfFind">Cari lokasi barang</button>
+    <div id="tfMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div id="tfOut"></div>
+</div></section>
+
+
+<section class="screen" id="s-sync"><div class="wrap">
+  <div class="eyebrow">Selaraskan dengan SAP</div>
+  <div class="hint">Menghitung ulang stock "belum ada lokasi" = total SAP dikurangi yang sudah di kavling. Perlu persetujuan RDC Manager sebelum berlaku.</div>
+  <div class="card">
+    <label>Alasan (opsional)</label>
+    <input id="syReason" placeholder="mis. setelah impor lokasi dari FiTH" style="margin-bottom:12px">
+    <button class="btn" id="syAsk">Ajukan penyelarasan</button>
+    <div id="syMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div id="syOut"></div>
+</div></section>
+
 <section class="screen" id="s-more"><div class="wrap">
   <div class="eyebrow">Menu lainnya</div>
   <div class="card" style="padding:4px 14px">
     <div class="lrow" style="cursor:pointer" onclick="go('sap')"><div class="g"><div class="t">Upload Stock SAP</div><div class="s">Sumber semua stock awal</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('sync')"><div class="g"><div class="t">Selaraskan dengan SAP</div><div class="s">Perlu persetujuan RDC Manager</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('transfer')"><div class="g"><div class="t">Pindah Lokasi Barang</div><div class="s">Mutasi antar kavling</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('tasks')"><div class="g"><div class="t">Tugas Picking</div><div class="s">Draft, revisi, eksekusi</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('import')"><div class="g"><div class="t">Impor Layout &amp; Stock</div><div class="s">Dari FiTH / file kavling</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('recon')"><div class="g"><div class="t">Validasi Harian SAP</div><div class="s">Bandingkan stock WMS vs SAP</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('unloc')"><div class="g"><div class="t">Stock Belum Ada Lokasi</div><div class="s">Perlu di-putaway ke kavling</div></div><div class="n muted">›</div></div>
@@ -468,52 +511,70 @@ function parseRK(wb){
   return out;
 }
 function renderPick(rows,fname){
+  PICK_RESULT=rows;
   const ok=rows.filter(r=>r.status==='OK').length, bad=rows.length-ok;
   const byTruck={};
   rows.forEach(r=>{(byTruck[r.truck]=byTruck[r.truck]||[]).push(r);});
   let h=`<div class="card" style="display:flex;gap:8px;align-items:center;padding:11px 14px">
     <div style="flex:1"><div style="font-weight:650;font-size:13.5px">${esc(fname)}</div>
-    <div class="muted" style="font-size:12px">${rows.length} baris · ${Object.keys(byTruck).length} mobil</div></div>
+    <div class="muted" style="font-size:12px">${rows.length} baris \u00b7 ${Object.keys(byTruck).length} mobil</div></div>
     <span class="pill p-ok">${ok} OK</span>${bad?`<span class="pill p-stop">${bad} SALAH</span>`:''}</div>`;
+  if(ok) h+=`<button class="btn ghost" id="pickXls" style="margin-bottom:4px">\u2b07 Unduh daftar picking (Excel)</button>`;
   Object.keys(byTruck).forEach(t=>{
     h+=`<div class="truck"><span class="plate">${esc(t)}</span><span class="cnt">${byTruck[t].length} baris</span></div>`;
     byTruck[t].forEach(r=>{
       const cls=r.status==='OK'?'':(r.status==='KURANG'?'warn':'stop');
+      const steps=r.steps||[];
       let strip='';
-      if(r.pick_plan){
-        strip='<div class="tk-strip">'+r.pick_plan.split(' + ').map((p,i)=>{
-          const rimpil=/\(rimpil\)/.test(p);
-          const clean=p.replace(' (rimpil)','');
-          const [loc,q]=clean.split(':');
-          return `<div class="stepline"><div class="stepno">${i+1}</div><div class="loc">${esc(loc)}</div>
-            ${rimpil?'<span class="tag-rimpil">RIMPIL</span>':''}<div class="stepqty">${esc(q)}</div></div>`;
-        }).join('')+'</div>';
+      if(steps.length){
+        strip='<div class="tk-strip">'+steps.map((s,i)=>`
+          <div class="stepline"><div class="stepno">${i+1}</div>
+          <div style="flex:1;min-width:0">
+            <div class="loc">${esc(s.gudang)} \u00b7 ${esc(s.block)} \u00b7 ${esc(s.kavling)}</div>
+            <div style="font-size:10.5px;color:var(--muted);font-family:var(--mono)">${esc(s.location_code)}</div>
+          </div>
+          ${s.rimpil?'<span class="tag-rimpil">RIMPIL</span>':''}
+          <div class="stepqty">${fmt(s.qty)}</div></div>`).join('')+'</div>';
       }
       h+=`<div class="ticket ${cls}">
-        <div class="tk-top"><div class="m"><div class="tk-mat">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
-        <div class="tk-desc">${esc(r.so_no||'')}</div></div>
+        <div class="tk-top"><div class="m">
+          <div class="tk-mat">${esc(r.motif||r.material_code)}</div>
+          <div class="tk-desc">${esc(r.material_code)}${r.batch?' \u00b7 Seri '+esc(r.batch):''}${r.so_no?' \u00b7 SO '+esc(r.so_no):''}</div>
+        </div>
         <div class="tk-qty"><b>${fmt(r.qty_requested)}</b><span>BOX</span></div></div>
         ${strip}<div class="tk-note">${esc(r.catatan||'')}</div></div>`;
     });
   });
-  h+=ok?`<div style="height:8px"></div><button class="btn brand" id="execPick">Jalankan ${ok} baris yang OK</button>
-    <p class="muted" style="text-align:center;margin:10px 0 0;font-size:12px">Baris bermasalah tidak ikut diproses.</p>`
-   :`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg);margin-top:8px">Tidak ada baris yang bisa dijalankan. Perbaiki RK Final dulu.</div>`;
+  h+=`<div style="height:8px"></div><button class="btn brand" id="makeTask">Buat Tugas Picking (stock belum dipotong)</button>
+    <p class="muted" style="text-align:center;margin:10px 0 0;font-size:12px">Bisa direvisi dulu. Stock baru dipotong saat Eksekusi.</p>`;
   document.getElementById('pickOut').innerHTML=h;
-  const b=document.getElementById('execPick');
+  const xb=document.getElementById('pickXls');
+  if(xb) xb.onclick=()=>downloadPickList(fname);
+  const b=document.getElementById('makeTask');
   if(b) b.onclick=async()=>{
-    b.disabled=true;b.textContent='⏳ Menjalankan…';
+    b.disabled=true;b.textContent='\u23f3 Membuat tugas\u2026';
     try{
-      const res=await rpc('wms_execute_picklist',{p_rdc:RDC,p_lines:PICK_LINES,p_reference:fname});
-      document.getElementById('pickOut').innerHTML=
-        `<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
-          <div style="font-weight:650;color:var(--ok)">${res.applied} baris tersimpan sebagai Stock Out.</div>
-          <div class="muted" style="margin-top:4px">${res.skipped} baris dilewati karena bermasalah.</div></div>`;
-      loadHome(); loadStock();
+      const res=await rpc('wms_pick_task_create',{p_rdc:RDC,p_filename:fname,p_lines:PICK_LINES});
+      openTask(res.task_id);
     }catch(e){ b.disabled=false;b.textContent='Coba lagi';
       document.getElementById('pickOut').insertAdjacentHTML('afterbegin',
         `<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
   };
+}
+let PICK_RESULT=null;
+function downloadPickList(fname){
+  const aoa=[['Mobil','SO','Motif','Kode Material','Seri','Gudang','Block','Kavling','Kode Lokasi','Qty Ambil','Rimpil','Status']];
+  (PICK_RESULT||[]).forEach(r=>{
+    if(!(r.steps||[]).length){
+      aoa.push([r.truck,r.so_no,r.motif,r.material_code,r.batch,'','','','',r.qty_requested,'',r.status+' \u2014 '+(r.catatan||'')]);
+      return;
+    }
+    r.steps.forEach(s=>aoa.push([r.truck,r.so_no,r.motif,r.material_code,r.batch,
+      s.gudang,s.block,s.kavling,s.location_code,s.qty,s.rimpil?'RIMPIL':'',r.status]));
+  });
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),'Daftar Picking');
+  XLSX.writeFile(wb,'Picking_'+RDC+'_'+fname.replace(/\.[^.]+$/,'')+'.xlsx');
 }
 
 // ---------- putaway ----------
@@ -1101,5 +1162,208 @@ async function runImport(){
   }catch(e){ b.disabled=false; b.textContent='Coba lagi';
     out.insertAdjacentHTML('afterbegin',`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
 }
+
+// ================= TUGAS PICKING (draft → revisi → eksekusi) =================
+let CUR_TASK=null;
+async function loadTasks(){
+  const el=document.getElementById('taskOut');
+  el.innerHTML='<div class="card muted">⏳ Memuat…</div>';
+  try{
+    const rows=await rpc('wms_pick_task_list',{p_rdc:RDC});
+    el.innerHTML = rows.length
+      ? `<div class="card" style="padding:4px 14px">`+rows.map(r=>`
+        <div class="lrow" style="cursor:pointer" onclick="openTask(${r.id})">
+        <div class="g"><div class="t">${esc(r.filename||'RK')}</div>
+        <div class="s">${esc(r.waktu)} · ${fmt(r.baris)} baris · ${fmt(r.total_qty)} box${r.bermasalah?' · '+fmt(r.bermasalah)+' bermasalah':''}</div></div>
+        <span class="pill ${r.status==='SELESAI'?'p-ok':r.status==='BATAL'?'p-stop':'p-warn'}">${esc(r.status)}</span></div>`).join('')+`</div>`
+      : `<div class="card muted">Belum ada tugas picking.</div>`;
+  }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+async function openTask(id){
+  CUR_TASK=id; go('task');
+  const el=document.getElementById('taskDetail');
+  el.innerHTML='<div class="card muted">⏳ Memuat…</div>';
+  try{
+    const [lines,list]=await Promise.all([rpc('wms_pick_task_lines',{p_task:id}),rpc('wms_pick_task_list',{p_rdc:RDC})]);
+    const info=list.find(x=>x.id===id)||{};
+    const editable = info.status==='DRAFT';
+    const byTruck={};
+    lines.forEach(l=>{(byTruck[l.truck||'-']=byTruck[l.truck||'-']||[]).push(l);});
+    let h=`<div class="card" style="display:flex;align-items:center;gap:8px;padding:11px 14px">
+      <div style="flex:1"><div style="font-weight:650;font-size:13.5px">${esc(info.filename||'RK')}</div>
+      <div class="muted" style="font-size:12px">${fmt(lines.length)} baris · ${esc(info.waktu||'')}</div></div>
+      <span class="pill ${info.status==='SELESAI'?'p-ok':info.status==='BATAL'?'p-stop':'p-warn'}">${esc(info.status||'')}</span></div>`;
+    if(editable) h+=`<div class="hint">Stock BELUM dipotong. Ubah qty bila ada revisi, lalu tekan Eksekusi.</div>`;
+    Object.keys(byTruck).forEach(t=>{
+      h+=`<div class="truck"><span class="plate">${esc(t)}</span><span class="cnt">${byTruck[t].length} baris</span></div>`;
+      byTruck[t].forEach(l=>{
+        const bad=l.status!=='OK';
+        h+=`<div class="ticket ${bad?(l.status==='KURANG'?'warn':'stop'):''}">
+          <div class="tk-top"><div class="m">
+            <div class="tk-mat">${esc(l.motif||l.material_code)}</div>
+            <div class="tk-desc">${esc(l.material_code)}${l.batch?' · Seri '+esc(l.batch):''}${l.so_no?' · SO '+esc(l.so_no):''}</div>
+          </div><div class="tk-qty"><b>${fmt(l.qty_requested)}</b><span>DIMINTA</span></div></div>
+          <div class="tk-strip">
+            ${l.location_code?`<div class="stepline"><div style="flex:1">
+              <div class="loc">${esc(l.gudang)} · ${esc(l.block)} · ${esc(l.kavling)}</div>
+              <div style="font-size:10.5px;color:var(--muted);font-family:var(--mono)">${esc(l.location_code)}</div></div></div>`
+              :`<div class="muted" style="font-size:12.5px">Belum ada lokasi</div>`}
+            <div style="display:flex;gap:8px;align-items:flex-end;margin-top:8px">
+              <div style="flex:1"><label>Qty ambil</label>
+                <input inputmode="numeric" value="${l.qty_pick??''}" id="ln_${l.id}" ${editable?'':'disabled'}
+                  style="padding:9px;font-family:var(--mono);text-align:right"></div>
+              ${editable?`<button class="btn" style="flex:0 0 auto;width:auto;padding:10px 14px" onclick="saveLine(${l.id})">Simpan</button>`:''}
+            </div>
+            ${l.done?'<div class="muted" style="font-size:12px;margin-top:6px">✓ Sudah dipotong</div>':''}
+          </div>
+          ${l.catatan?`<div class="tk-note">${esc(l.catatan)}</div>`:''}</div>`;
+      });
+    });
+    if(editable){
+      h+=`<div style="height:8px"></div>
+        <button class="btn brand" onclick="execTask(${id})">Eksekusi — potong stock sekarang</button>
+        <button class="btn ghost" style="margin-top:8px" onclick="cancelTask(${id})">Batalkan tugas</button>`;
+    }
+    el.innerHTML=h;
+  }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+async function saveLine(id){
+  const v=parseFloat(document.getElementById('ln_'+id).value);
+  if(!isFinite(v)||v<0){alert('Qty tidak valid.');return;}
+  try{ await rpc('wms_pick_line_edit',{p_line:id,p_qty:v}); openTask(CUR_TASK); }
+  catch(e){ alert('Gagal: '+e.message); }
+}
+async function execTask(id){
+  if(!confirm('Potong stock sekarang sesuai tugas ini?\n\nSetelah dieksekusi tidak bisa diubah lagi.')) return;
+  try{
+    const r=await rpc('wms_pick_task_execute',{p_task:id});
+    alert(`${r.dipotong} baris dipotong dari stock.${r.gagal?'\n'+r.gagal+' gagal.':''}`);
+    openTask(id); loadHome(); loadStock(); loadTasks();
+  }catch(e){ alert('Gagal: '+e.message); }
+}
+async function cancelTask(id){
+  if(!confirm('Batalkan tugas picking ini? Stock tidak akan dipotong.')) return;
+  try{ await rpc('wms_pick_task_cancel',{p_task:id}); openTask(id); loadTasks(); }
+  catch(e){ alert('Gagal: '+e.message); }
+}
+const _go4=go;
+go=function(s){ _go4(s); if(s==='tasks') loadTasks(); };
+
+// ================= PINDAH LOKASI (TRANSFER) =================
+let TF_LOCS=[], TF_TARGETS=[];
+document.getElementById('tfFind').addEventListener('click',async()=>{
+  const mat=document.getElementById('tfMat').value.trim().toUpperCase();
+  const batch=document.getElementById('tfBatch').value.trim();
+  const msg=document.getElementById('tfMsg'); msg.textContent='';
+  if(!mat){msg.style.color='var(--stop)';msg.textContent='Kode material wajib diisi.';return;}
+  msg.style.color='var(--muted)'; msg.textContent='Mencari…';
+  try{
+    TF_LOCS=await rpc('wms_stock_locations',{p_rdc:RDC,p_material:mat,p_batch:batch||null});
+    msg.textContent='';
+    if(!TF_LOCS.length){
+      document.getElementById('tfOut').innerHTML='<div class="card muted">Barang ini tidak ada di kavling manapun.</div>';
+      return;
+    }
+    TF_TARGETS=await rpc('wms_transfer_targets',{p_rdc:RDC,p_exclude:null});
+    document.getElementById('tfOut').innerHTML='<div class="eyebrow">Pilih kavling asal</div>'+
+      TF_LOCS.map((l,i)=>`<div class="ticket" style="cursor:pointer" onclick="pickSource(${i})">
+        <div class="tk-top"><div class="m">
+          <div class="tk-mat">${esc(l.gudang)} · ${esc(l.block)} · ${esc(l.kavling)}</div>
+          <div class="tk-desc">${esc(l.location_code)} · Seri ${esc(l.batch||'-')}${l.status!=='GOOD'?' · '+esc(l.status):''}</div>
+        </div><div class="tk-qty"><b>${fmt(l.qty)}</b><span>BOX</span></div></div>
+        ${l.rimpil?'<div class="tk-strip"><span class="tag-rimpil">RIMPIL</span></div>':''}</div>`).join('');
+  }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
+});
+function pickSource(i){
+  const l=TF_LOCS[i];
+  const opts=TF_TARGETS.filter(t=>t.kavling_id!==l.kavling_id).map(t=>{
+    const sisa=t.kapasitas?(t.kapasitas-t.terisi):null;
+    return `<option value="${t.kavling_id}">${esc(t.location_code)}${sisa!=null?' — sisa '+fmt(sisa):''}</option>`;}).join('');
+  document.getElementById('tfOut').innerHTML=`
+    <div class="eyebrow">Pindahkan dari</div>
+    <div class="ticket"><div class="tk-top"><div class="m">
+      <div class="tk-mat">${esc(l.gudang)} · ${esc(l.block)} · ${esc(l.kavling)}</div>
+      <div class="tk-desc">${esc(l.location_code)} · Seri ${esc(l.batch||'-')}</div></div>
+      <div class="tk-qty"><b>${fmt(l.qty)}</b><span>TERSEDIA</span></div></div></div>
+    <div class="card">
+      <label>Qty dipindah</label>
+      <input id="tfQty" inputmode="numeric" value="${l.qty}" style="margin-bottom:10px">
+      <label>Kavling tujuan</label>
+      <select id="tfTo" style="margin-bottom:12px">${opts}</select>
+      <label>Keterangan (opsional)</label>
+      <input id="tfNote" placeholder="mis. rapikan rimpil" style="margin-bottom:12px">
+      <button class="btn brand" onclick="doTransfer(${i})">Pindahkan sekarang</button>
+      <button class="btn ghost" style="margin-top:8px" onclick="document.getElementById('tfFind').click()">← Pilih kavling lain</button>
+      <div id="tfDone" style="font-size:13px;margin-top:10px"></div>
+    </div>`;
+}
+async function doTransfer(i){
+  const l=TF_LOCS[i];
+  const qty=parseFloat(document.getElementById('tfQty').value);
+  const to=parseInt(document.getElementById('tfTo').value);
+  const note=document.getElementById('tfNote').value.trim();
+  const d=document.getElementById('tfDone'); d.style.color='var(--muted)'; d.textContent='Memindahkan…';
+  if(!isFinite(qty)||qty<=0){d.style.color='var(--stop)';d.textContent='Qty tidak valid.';return;}
+  if(qty>Number(l.qty)){d.style.color='var(--stop)';d.textContent=`Qty melebihi stock di kavling itu (${fmt(l.qty)} box).`;return;}
+  try{
+    const r=await rpc('wms_transfer',{p_material:l.material_code||document.getElementById('tfMat').value.trim().toUpperCase(),
+      p_qty:qty,p_from:l.kavling_id,p_to:to,p_batch:l.batch,p_status:l.status,p_remarks:note||null});
+    document.getElementById('tfOut').innerHTML=
+      `<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
+        <div style="font-weight:650;color:var(--ok)">${fmt(r.qty)} box dipindahkan.</div>
+        <div class="muted" style="margin-top:4px">${esc(r.dari)} → ${esc(r.ke)}</div>
+        <button class="btn" style="margin-top:12px" onclick="document.getElementById('tfFind').click()">Pindah lagi</button></div>`;
+    loadHome(); loadStock(); loadLoc();
+  }catch(e){ d.style.color='var(--stop)'; d.textContent='Gagal: '+e.message; }
+}
+const _go5=go;
+go=function(s){ _go5(s); };
+
+// ================= SELARASKAN DENGAN SAP (perlu approval Master) =================
+document.getElementById('syAsk').addEventListener('click',async()=>{
+  const msg=document.getElementById('syMsg');
+  msg.style.color='var(--muted)'; msg.textContent='Menghitung…';
+  try{
+    const r=await rpc('wms_resync_request',{p_rdc:RDC,p_alasan:document.getElementById('syReason').value.trim()||null});
+    msg.style.color='var(--ok)'; msg.textContent='✓ Pengajuan dibuat. Stock belum diubah.';
+    document.getElementById('syReason').value='';
+    loadSync();
+  }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
+});
+async function loadSync(){
+  const el=document.getElementById('syOut');
+  el.innerHTML='<div class="card muted">⏳ Memuat…</div>';
+  try{
+    const rows=await rpc('wms_resync_list',{p_rdc:RDC});
+    if(!rows.length){ el.innerHTML='<div class="card muted">Belum ada pengajuan.</div>'; return; }
+    el.innerHTML='<div class="eyebrow">Riwayat pengajuan</div>'+rows.map(r=>{
+      const p=r.status==='MENUNGGU';
+      return `<div class="ticket ${p?'warn':''}">
+        <div class="tk-top"><div class="m">
+          <div class="tk-mat">${esc(r.status)}</div>
+          <div class="tk-desc">${esc(r.by||'')} · ${esc(r.waktu||'')}${r.alasan?' · '+esc(r.alasan):''}</div>
+        </div><div class="tk-qty"><b>${Number(r.selisih)>0?'+':''}${fmt(r.selisih)}</b><span>SELISIH</span></div></div>
+        <div class="tk-strip">
+          <div class="muted" style="font-size:12.5px;line-height:1.7">
+            Total SAP: <b>${fmt(r.total_sap)}</b> box<br>
+            Sudah di kavling: <b>${fmt(r.sudah_di_kavling)}</b> box<br>
+            Belum ada lokasi sekarang: <b>${fmt(r.sekarang)}</b> box<br>
+            Usulan jadi: <b>${fmt(r.usulan)}</b> box</div>
+          ${p && ROLE==='master' ? `<div class="row" style="margin-top:10px">
+            <button class="btn" style="padding:10px" onclick="syDecide(${r.id},true)">Setujui</button>
+            <button class="btn ghost" style="padding:10px" onclick="syDecide(${r.id},false)">Tolak</button></div>`
+            : p ? `<div class="muted" style="margin-top:8px;font-size:12.5px">Menunggu RDC Manager.</div>`
+            : `<div class="muted" style="margin-top:8px;font-size:12.5px">${esc(r.decided_by||'')}${r.catatan_master?' — '+esc(r.catatan_master):''}</div>`}
+        </div></div>`;}).join('');
+  }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+async function syDecide(id,ok){
+  if(!confirm(ok?'Setujui penyelarasan? Stock "belum ada lokasi" akan dihitung ulang.':'Tolak pengajuan ini?')) return;
+  try{ await rpc('wms_resync_decide',{p_id:id,p_setuju:ok,p_catatan:null});
+    loadSync(); loadHome(); loadStock(); }
+  catch(e){ alert('Gagal: '+e.message); }
+}
+const _go6=go;
+go=function(s){ _go6(s); if(s==='sync') loadSync(); };
 
 </script></body></html>
