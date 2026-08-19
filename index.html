@@ -319,10 +319,20 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div id="rcHist"></div>
 </div></section>
 
+
+<section class="screen" id="s-import"><div class="wrap">
+  <div class="eyebrow">Impor Layout &amp; Stock (FiTH)</div>
+  <div class="hint">Upload CSV/Excel dari FiTH berisi kolom Material_Code, Batch, Quantity, Warehouse, Block, Kavling. Kavling yang belum ada akan dibuat otomatis.</div>
+  <input type="file" id="impFile" accept=".csv,.xlsx,.xls" style="display:none">
+  <button class="btn ghost" onclick="document.getElementById('impFile').click()">📄 Pilih file layout/stock…</button>
+  <div id="impOut" style="margin-top:14px"></div>
+</div></section>
+
 <section class="screen" id="s-more"><div class="wrap">
   <div class="eyebrow">Menu lainnya</div>
   <div class="card" style="padding:4px 14px">
     <div class="lrow" style="cursor:pointer" onclick="go('sap')"><div class="g"><div class="t">Upload Stock SAP</div><div class="s">Sumber semua stock awal</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('import')"><div class="g"><div class="t">Impor Layout &amp; Stock</div><div class="s">Dari FiTH / file kavling</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('recon')"><div class="g"><div class="t">Validasi Harian SAP</div><div class="s">Bandingkan stock WMS vs SAP</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('unloc')"><div class="g"><div class="t">Stock Belum Ada Lokasi</div><div class="s">Perlu di-putaway ke kavling</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('rusak')"><div class="g"><div class="t">Catat Barang Rusak</div><div class="s">Pindahkan stock rusak + alasan</div></div><div class="n muted">›</div></div>
@@ -999,5 +1009,97 @@ async function loadReconHist(){
 }
 const _go3=go;
 go=function(s){ _go3(s); if(s==='recon') loadReconHist(); };
+
+// ================= IMPOR LAYOUT & STOCK (FiTH) =================
+let IMP_ROWS=null;
+document.getElementById('impFile').addEventListener('change',e=>{ if(e.target.files.length) readImport(e.target.files[0]); e.target.value=''; });
+function readImport(file){
+  const out=document.getElementById('impOut');
+  out.innerHTML='<div class="card muted">⏳ Membaca file…</div>';
+  const fr=new FileReader();
+  fr.onload=ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
+      const rows=parseLayout(wb);
+      if(!rows.length){out.innerHTML='<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">File tidak dikenali. Perlu kolom Warehouse, Block, Kavling (Material_Code/Quantity opsional).</div>';return;}
+      IMP_ROWS=rows;
+      const kav=new Set(rows.map(r=>r.warehouse+'|'+r.block+'|'+r.kavling));
+      const wh=new Set(rows.map(r=>r.warehouse));
+      const bl=new Set(rows.map(r=>r.warehouse+'|'+r.block));
+      const withQty=rows.filter(r=>r.material&&r.qty>0);
+      const tot=withQty.reduce((s,r)=>s+r.qty,0);
+      out.innerHTML=`<div class="card">
+        <div style="font-weight:650;margin-bottom:10px">${esc(file.name)}</div>
+        <div class="kpis" style="grid-template-columns:1fr 1fr">
+          <div class="kpi"><div class="lbl">Gudang</div><div class="val">${fmt(wh.size)}</div></div>
+          <div class="kpi"><div class="lbl">Block</div><div class="val">${fmt(bl.size)}</div></div>
+          <div class="kpi"><div class="lbl">Kavling</div><div class="val">${fmt(kav.size)}</div></div>
+          <div class="kpi"><div class="lbl">Total Stock</div><div class="val">${fmt(tot)} <small>box</small></div></div>
+        </div>
+        <div class="muted" style="font-size:12.5px;margin-top:10px">${fmt(withQty.length)} baris stock dari ${fmt(rows.length)} baris file.</div>
+        <label style="margin-top:12px">Kapasitas per kavling (opsional)</label>
+        <input id="impKap" inputmode="numeric" placeholder="kosongkan bila belum tahu" style="margin-bottom:12px">
+        <button class="btn brand" id="impGo">Impor lokasi &amp; stock</button>
+        <p class="muted" style="font-size:12px;text-align:center;margin:8px 0 0">Kavling yang sudah ada tidak diduplikasi. Stock ditambahkan ke kavlingnya.</p>
+      </div>`;
+      document.getElementById('impGo').onclick=runImport;
+    }catch(err){ out.innerHTML=`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal membaca: ${esc(err.message)}</div>`; }
+  };
+  fr.readAsBinaryString(file);
+}
+function parseLayout(wb){
+  for(const sn of wb.SheetNames){
+    const g=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null,raw:true});
+    if(!g.length) continue;
+    let hr=-1;
+    for(let i=0;i<Math.min(g.length,10);i++){
+      const h=(g[i]||[]).map(x=>String(x||'').trim().toLowerCase().replace(/^\ufeff/,''));
+      if(h.includes('warehouse')&&h.includes('kavling')){hr=i;break;}
+    }
+    if(hr<0) continue;
+    const H=(g[hr]||[]).map(x=>String(x||'').trim().toLowerCase().replace(/^\ufeff/,''));
+    const c=n=>H.indexOf(n);
+    const cW=c('warehouse'),cB=c('block'),cK=c('kavling'),
+          cM=c('material_code')>=0?c('material_code'):c('material'),
+          cBa=c('batch'),cQ=c('quantity')>=0?c('quantity'):c('qty');
+    const out=[];
+    for(let i=hr+1;i<g.length;i++){
+      const r=g[i]; if(!r) continue;
+      const w=r[cW]==null?'':String(r[cW]).trim();
+      const b=cB>=0&&r[cB]!=null?String(r[cB]).trim():'';
+      const k=r[cK]==null?'':String(r[cK]).trim();
+      if(!w||!k) continue;
+      out.push({warehouse:w,block:b||'-',kavling:k,
+        material:cM>=0&&r[cM]!=null?String(r[cM]).trim():'',
+        batch:cBa>=0&&r[cBa]!=null?String(r[cBa]).trim():'',
+        qty:cQ>=0?Number(r[cQ])||0:0});
+    }
+    if(out.length) return out;
+  }
+  return [];
+}
+async function runImport(){
+  const b=document.getElementById('impGo'); b.disabled=true;
+  const kap=parseFloat(document.getElementById('impKap').value)||null;
+  const out=document.getElementById('impOut');
+  const CH=400; let acc={gudang_baru:0,block_baru:0,kavling_baru:0,baris_stock:0,dilewati:0};
+  try{
+    for(let i=0;i<IMP_ROWS.length;i+=CH){
+      b.textContent=`⏳ Mengimpor ${Math.min(i+CH,IMP_ROWS.length)} / ${IMP_ROWS.length}…`;
+      const r=await rpc('wms_import_layout',{p_rdc:RDC,p_rows:IMP_ROWS.slice(i,i+CH),
+        p_with_stock:true,p_default_kapasitas:kap});
+      Object.keys(acc).forEach(k=>acc[k]+=Number(r[k]||0));
+    }
+    out.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
+      <div style="font-weight:650;color:var(--ok);margin-bottom:6px">Impor selesai.</div>
+      <div class="muted" style="font-size:13px;line-height:1.7">
+        Gudang baru: ${fmt(acc.gudang_baru)}<br>Block baru: ${fmt(acc.block_baru)}<br>
+        Kavling baru: ${fmt(acc.kavling_baru)}<br>Baris stock: ${fmt(acc.baris_stock)}
+        ${acc.dilewati?'<br>Dilewati: '+fmt(acc.dilewati):''}</div>
+      <button class="btn" style="margin-top:12px" onclick="go('stock')">Lihat stock</button></div>`;
+    loadHome(); loadStock(); loadLoc();
+  }catch(e){ b.disabled=false; b.textContent='Coba lagi';
+    out.insertAdjacentHTML('afterbegin',`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
+}
 
 </script></body></html>
