@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WMS SLS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --ink:#14161A;        /* graphite: warehouse concrete at night */
+  --ink-2:#2A2E35;
+  --paper:#F7F5F1;      /* warm paper */
+  --card:#FFFFFF;
+  --line:#DFDAD2;
+  --muted:#6E6A63;
+  --ok:#1B7F4B;
+  --ok-bg:#E6F4EC;
+  --warn:#9A6300;
+  --warn-bg:#FDF3DF;
+  --stop:#B3261E;
+  --stop-bg:#FCEBE9;
+  --brand:#0F5C63;      /* glaze teal — reserved for identity, never for status */
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--paper);color:var(--ink);
+  font-size:15px;line-height:1.5;
+  padding-bottom:76px;
+}
+/* ---------- header ---------- */
+.hdr{
+  position:sticky;top:0;z-index:20;background:var(--ink);color:#fff;
+  padding:14px 16px 12px;display:flex;align-items:center;gap:12px;
+}
+.mark{
+  width:30px;height:30px;border-radius:7px;background:var(--brand);
+  display:grid;place-items:center;font-weight:800;font-size:13px;flex:0 0 auto;
+  font-family:var(--mono);
+}
+.hdr h1{font-size:15px;margin:0;font-weight:650;letter-spacing:-.2px}
+.hdr .sub{font-size:11.5px;color:#9AA0A6;font-family:var(--mono);letter-spacing:.3px}
+.hdr .who{margin-left:auto;text-align:right;font-size:11px;color:#9AA0A6;line-height:1.35}
+.hdr .who b{display:block;color:#fff;font-size:12.5px;font-weight:600}
+
+/* ---------- generic ---------- */
+.wrap{padding:16px 16px 8px;max-width:760px;margin:0 auto}
+.eyebrow{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--muted);margin:22px 0 8px;display:flex;align-items:center;gap:8px;
+}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+.muted{color:var(--muted);font-size:13px}
+.btn{
+  display:block;width:100%;padding:14px;border-radius:11px;border:none;
+  background:var(--ink);color:#fff;font-size:15px;font-weight:600;cursor:pointer;
+  font-family:inherit;
+}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn.brand{background:var(--brand)}
+.btn:active{transform:translateY(1px)}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+label{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:5px;
+  letter-spacing:.3px;text-transform:uppercase;font-family:var(--mono);font-size:10.5px}
+input,select{
+  width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;
+  font-size:16px;font-family:inherit;background:#fff;color:var(--ink)
+}
+input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;border-color:transparent}
+
+/* ---------- status pills ---------- */
+.pill{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;
+  font-size:11px;font-weight:700;font-family:var(--mono);letter-spacing:.4px;
+}
+.p-ok{background:var(--ok-bg);color:var(--ok)}
+.p-warn{background:var(--warn-bg);color:var(--warn)}
+.p-stop{background:var(--stop-bg);color:var(--stop)}
+
+/* ---------- KPI ---------- */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px}
+.kpi .lbl{font-family:var(--mono);font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.kpi .val{font-size:26px;font-weight:700;letter-spacing:-1px;margin-top:3px;font-variant-numeric:tabular-nums}
+.kpi .val small{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:0}
+.kpi.alert{border-color:#F0C9C5;background:var(--stop-bg)}
+.kpi.alert .val{color:var(--stop)}
+
+/* ---------- SIGNATURE: pick ticket ---------- */
+.ticket{
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  margin-bottom:10px;overflow:hidden;
+}
+.ticket.stop{border-color:#EFC4C0}
+.ticket.warn{border-color:#EBD5A3}
+.tk-top{padding:12px 14px 10px;display:flex;align-items:flex-start;gap:10px}
+.tk-top .m{flex:1;min-width:0}
+.tk-mat{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:-.2px}
+.tk-desc{font-size:12.5px;color:var(--muted);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk-qty{text-align:right;flex:0 0 auto}
+.tk-qty b{font-size:19px;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.tk-qty span{display:block;font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:.6px}
+
+/* the strip: perforated boarding-pass edge */
+.tk-strip{
+  border-top:1.5px dashed var(--line);background:#FBFAF8;padding:11px 14px;
+}
+.stop .tk-strip{background:var(--stop-bg);border-top-color:#EFC4C0}
+.warn .tk-strip{background:var(--warn-bg);border-top-color:#EBD5A3}
+.stepline{display:flex;align-items:center;gap:9px;padding:6px 0}
+.stepline+.stepline{border-top:1px solid rgba(0,0,0,.06)}
+.stepno{
+  width:22px;height:22px;border-radius:6px;background:var(--ink);color:#fff;
+  display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:700;flex:0 0 auto
+}
+.loc{font-family:var(--mono);font-size:14.5px;font-weight:700;letter-spacing:-.3px}
+.stepqty{margin-left:auto;font-family:var(--mono);font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.tag-rimpil{
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.5px;
+  background:var(--brand);color:#fff;padding:2px 6px;border-radius:4px;margin-left:6px
+}
+.tk-note{font-size:12.5px;padding:9px 14px;border-top:1px solid var(--line);color:var(--muted)}
+.stop .tk-note{color:var(--stop);background:var(--stop-bg);border-top-color:#EFC4C0;font-weight:600}
+.warn .tk-note{color:var(--warn);background:var(--warn-bg);border-top-color:#EBD5A3;font-weight:600}
+
+/* ---------- truck group ---------- */
+.truck{
+  display:flex;align-items:center;gap:9px;margin:18px 0 9px;
+}
+.truck .plate{
+  font-family:var(--mono);font-size:12px;font-weight:700;background:var(--ink);color:#fff;
+  padding:4px 9px;border-radius:5px;letter-spacing:.5px
+}
+.truck .cnt{font-size:12px;color:var(--muted);margin-left:auto;font-family:var(--mono)}
+
+/* ---------- table-ish list ---------- */
+.lrow{display:flex;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.lrow:last-child{border-bottom:none}
+.lrow .g{flex:1;min-width:0}
+.lrow .t{font-family:var(--mono);font-size:13.5px;font-weight:600}
+.lrow .s{font-size:12px;color:var(--muted);margin-top:1px}
+.lrow .n{font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--brand)}
+.bar.full i{background:var(--stop)}
+.bar.high i{background:var(--warn)}
+
+/* ---------- bottom nav ---------- */
+.nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);
+  border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.nav button{
+  background:none;border:none;padding:9px 2px 10px;cursor:pointer;font-family:inherit;
+  display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:10.5px;
+}
+.nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.nav button.on{color:var(--brand);font-weight:700}
+.screen{display:none}
+.screen.on{display:block}
+.hint{font-size:11.5px;color:var(--muted);font-family:var(--mono);
+  background:#EFEDE8;border-radius:8px;padding:8px 10px;margin-bottom:12px;line-height:1.5}
+@media (min-width:720px){ .kpis{grid-template-columns:repeat(4,1fr)} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style></head><body>
+<div id="loginView" style="min-height:100vh;display:grid;place-items:center;background:var(--ink);padding:24px">
+  <div style="width:100%;max-width:340px;background:var(--card);border-radius:16px;padding:26px">
+    <div class="mark" style="margin-bottom:14px">SLS</div>
+    <h2 style="margin:0 0 3px;font-size:19px">Warehouse Management</h2>
+    <p class="muted" style="margin:0 0 18px;font-size:13px">Masuk dengan password RDC Anda</p>
+    <label>Password</label>
+    <input type="password" id="pw" placeholder="Password" style="margin-bottom:12px">
+    <button class="btn brand" id="loginBtn">Masuk</button>
+    <div id="loginMsg" style="margin-top:10px;font-size:13px;color:var(--stop)"></div>
+  </div>
+</div>
+
+<div id="appView" style="display:none">
+<div class="hdr">
+  <div class="mark">SLS</div>
+  <div><h1>Warehouse Management</h1><div class="sub" id="hdrSub">MEMUAT…</div></div>
+  <div class="who">Masuk sebagai<b id="whoRole">—</b></div>
+</div>
+
+<section class="screen on" id="s-home"><div class="wrap">
+  <div id="rdcPickWrap" style="display:none;margin-bottom:6px">
+    <label>RDC</label><select id="rdcPick"></select>
+  </div>
+  <div class="eyebrow">Kondisi hari ini</div>
+  <div class="kpis" id="homeKpis"></div>
+  <div class="eyebrow">Aktivitas terakhir</div>
+  <div class="card" style="padding:4px 14px" id="homeRecent"></div>
+</div></section>
+
+<section class="screen" id="s-pick"><div class="wrap">
+  <div class="eyebrow">Picking dari RK Final</div>
+  <div class="hint">Upload RK Final → sistem cek ke stock asli → tandai yang salah sebelum barang naik mobil.</div>
+  <input type="file" id="rkFile" accept=".ods,.xlsx,.xls" style="display:none">
+  <button class="btn ghost" onclick="document.getElementById('rkFile').click()">📄 Pilih file RK Final…</button>
+  <div id="pickOut" style="margin-top:14px"></div>
+</div></section>
+
+<section class="screen" id="s-put"><div class="wrap">
+  <div class="eyebrow">Barang masuk — cari lokasi</div>
+  <div class="hint">Sistem memilihkan kavling. Anda tinggal setujui atau ganti.</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Material</label><input id="puMat" placeholder="AGT912214R"></div>
+      <div style="max-width:120px"><label>Series</label><input id="puBatch" placeholder="S09"></div>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <div><label>Qty (box)</label><input id="puQty" inputmode="numeric" placeholder="100"></div>
+      <div><label>Jenis</label><select id="puType"><option>Inbound</option><option>BTB</option><option>Retur</option><option>Others</option></select></div>
+    </div>
+    <button class="btn" id="puFind">Cari lokasi</button>
+    <div class="admin-msg" id="puMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div id="puOut"></div>
+</div></section>
+
+<section class="screen" id="s-stock"><div class="wrap">
+  <div class="eyebrow">Cari stock</div>
+  <input id="stSearch" placeholder="Kode material, series, atau kavling…" style="margin-bottom:12px">
+  <div id="stOut"></div>
+</div></section>
+
+<section class="screen" id="s-loc"><div class="wrap">
+  <div class="eyebrow">Struktur gudang</div>
+  <div class="hint">Kode lokasi dibuat otomatis. Kavling berisi stock tidak bisa dinonaktifkan.</div>
+  <div id="locOut"></div>
+  <div class="card" style="margin-top:10px">
+    <div style="font-weight:650;margin-bottom:10px;font-size:14px">Tambah kavling</div>
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Gudang</label><input id="nlWh" placeholder="A"></div>
+      <div><label>Block</label><input id="nlBlock" placeholder="B01"></div>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Line (opsional)</label><input id="nlLine" placeholder="kosongkan bila belum dipakai"></div>
+      <div><label>Kavling</label><input id="nlKav" placeholder="K01"></div>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <div><label>Kapasitas (box)</label><input id="nlKap" inputmode="numeric" placeholder="500"></div>
+      <div><label>Luas (m²)</label><input id="nlLuas" inputmode="numeric" placeholder="12"></div>
+    </div>
+    <button class="btn" id="nlSave">Simpan kavling</button>
+    <div id="nlMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+</div></section>
+
+
+<section class="screen" id="s-opname"><div class="wrap">
+  <div class="eyebrow">Opname harian</div>
+  <div class="hint">Menampilkan barang yang bergerak beberapa hari terakhir. Hitung fisiknya, isi jumlahnya, sisanya dihitung sistem.</div>
+  <div class="row" style="margin-bottom:12px">
+    <div><label>Rentang gerak</label><select id="opDays"><option value="1">Hari ini</option><option value="3" selected>3 hari</option><option value="7">7 hari</option></select></div>
+    <div style="display:flex;align-items:flex-end"><button class="btn" id="opLoad">Muat daftar</button></div>
+  </div>
+  <div id="opOut"></div>
+  <div id="opPending"></div>
+</div></section>
+
+<section class="screen" id="s-rusak"><div class="wrap">
+  <div class="eyebrow">Catat barang rusak</div>
+  <div class="hint">Barang dipindah dari kavling asal ke kavling tujuan, statusnya berubah jadi RUSAK.</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Material</label><input id="dmMat" placeholder="AGT912214R"></div>
+      <div style="max-width:120px"><label>Series</label><input id="dmBatch" placeholder="S09"></div>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Dari kavling</label><select id="dmFrom"></select></div>
+      <div style="max-width:120px"><label>Qty rusak</label><input id="dmQty" inputmode="numeric" placeholder="0"></div>
+    </div>
+    <div style="margin-bottom:10px"><label>Taruh di kavling</label><select id="dmTo"></select></div>
+    <div style="margin-bottom:10px"><label>Alasan</label><select id="dmReason"></select></div>
+    <div id="dmOtherWrap" style="display:none;margin-bottom:10px"><label>Keterangan</label><input id="dmOther" placeholder="Uraikan penyebabnya"></div>
+    <button class="btn" id="dmSave">Catat barang rusak</button>
+    <div id="dmMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+</div></section>
+
+<section class="screen" id="s-arsip"><div class="wrap">
+  <div class="eyebrow">Arsip bulanan</div>
+  <div class="hint">Unduh transaksi bulan lama ke Excel, lalu hapus dari database agar tidak penuh. Ringkasan bulanan tetap tersimpan.</div>
+  <div id="arOut"></div>
+</div></section>
+
+
+<section class="screen" id="s-more"><div class="wrap">
+  <div class="eyebrow">Menu lainnya</div>
+  <div class="card" style="padding:4px 14px">
+    <div class="lrow" style="cursor:pointer" onclick="go('rusak')"><div class="g"><div class="t">Catat Barang Rusak</div><div class="s">Pindahkan stock rusak + alasan</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('loc')"><div class="g"><div class="t">Master Lokasi</div><div class="s">Gudang, block, line, kavling</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('arsip')"><div class="g"><div class="t">Arsip Bulanan</div><div class="s">Unduh Excel &amp; bersihkan database</div></div><div class="n muted">›</div></div>
+  </div>
+</div></section>
+
+<nav class="nav" style="grid-template-columns:repeat(6,1fr)">
+  <button class="on" data-s="home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Hari Ini</button>
+  <button data-s="pick" onclick="go('pick')"><svg viewBox="0 0 24 24"><path d="M9 4h6l1 3H8l1-3Z"/><path d="M4 7h16v13H4z"/><path d="M9 13l2 2 4-4"/></svg>Picking</button>
+  <button data-s="put" onclick="go('put')"><svg viewBox="0 0 24 24"><path d="M12 3v10"/><path d="M8 9l4 4 4-4"/><path d="M4 15v5h16v-5"/></svg>Putaway</button>
+  <button data-s="stock" onclick="go('stock')"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4z"/><path d="M4 11h16"/><path d="M10 7V4h4v3"/></svg>Stock</button>
+  <button data-s="opname" onclick="go('opname')"><svg viewBox="0 0 24 24"><path d="M9 3h6v3H9z"/><path d="M6 6h12v15H6z"/><path d="M9 12l2 2 4-4"/></svg>Opname</button>
+  <button data-s="more" onclick="go('more')"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>Lainnya</button>
+</nav>
+</div>
+
+<script>
+const SB='https://mfdckngkvjnemwgmkiiv.supabase.co';
+const ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mZGNrbmdrdmpuZW13Z21raWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMDcxMjUsImV4cCI6MjEwMTU4MzEyNX0.mFhv9hgQvjzg6AYfmEI2GiJ71I2xSkOozC43mwFcogU';
+let TOKEN=null, ROLE=null, SCOPE=null, RDC=null, PICK_LINES=null;
+
+const hdr=()=>({'apikey':ANON,'Authorization':'Bearer '+(TOKEN||ANON),'Content-Type':'application/json'});
+async function rpc(fn,params){
+  const r=await fetch(`${SB}/rest/v1/rpc/${fn}`,{method:'POST',headers:hdr(),body:JSON.stringify(params||{})});
+  if(!r.ok) throw new Error((await r.text()).slice(0,300));
+  return r.json();
+}
+const fmt=n=>Number(n||0).toLocaleString('id-ID');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// ---------- login (reuses the same auth as the dashboard) ----------
+document.getElementById('loginBtn').addEventListener('click',doLogin);
+document.getElementById('pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+async function doLogin(){
+  const pw=document.getElementById('pw').value.trim(), msg=document.getElementById('loginMsg');
+  if(!pw){msg.textContent='Password belum diisi.';return;}
+  msg.textContent='Memeriksa…'; msg.style.color='var(--muted)';
+  try{
+    const acct=await rpc('verify_password',{input_password:pw});
+    if(!acct){msg.textContent='Password salah.';msg.style.color='var(--stop)';return;}
+    ROLE=acct.role; SCOPE=acct.rdc_name;
+    const email=await rpc('get_login_email',{input_password:pw});
+    const r=await fetch(`${SB}/auth/v1/token?grant_type=password`,{method:'POST',
+      headers:{'apikey':ANON,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
+    if(!r.ok){msg.textContent='Gagal membuat sesi aman. Hubungi admin.';msg.style.color='var(--stop)';return;}
+    TOKEN=(await r.json()).access_token;
+    document.getElementById('loginView').style.display='none';
+    document.getElementById('appView').style.display='block';
+    document.getElementById('whoRole').textContent = ROLE==='master'?'RDC Manager':'Head RDC';
+    await setupRdc();
+  }catch(e){msg.textContent='Gagal: '+e.message;msg.style.color='var(--stop)';}
+}
+
+async function setupRdc(){
+  if(SCOPE){ RDC=SCOPE; }
+  else{
+    const rows=await fetch(`${SB}/rest/v1/rdc_master?select=name&order=name`,{headers:hdr()}).then(r=>r.json());
+    const sel=document.getElementById('rdcPick');
+    sel.innerHTML=rows.map(r=>`<option>${esc(r.name)}</option>`).join('');
+    document.getElementById('rdcPickWrap').style.display='block';
+    RDC=rows[0]?.name;
+    sel.onchange=()=>{RDC=sel.value; loadHome(); loadStock(); loadLoc();};
+  }
+  await loadHome(); loadStock(); loadLoc();
+}
+
+// ---------- screens ----------
+const SUB={home:'RDC · HARI INI',pick:'RK FINAL · PICKING',put:'BARANG MASUK',stock:'STOCK ON HAND',loc:'MASTER LOKASI',opname:'OPNAME HARIAN',rusak:'BARANG RUSAK',arsip:'ARSIP BULANAN',more:'MENU LAINNYA'};
+function go(s){
+  document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('on',e.id==='s-'+s));
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
+  document.getElementById('hdrSub').textContent=(RDC?RDC.toUpperCase()+' · ':'')+(SUB[s]||'');
+  window.scrollTo({top:0});
+}
+
+async function loadHome(){
+  const d=await rpc('wms_home_stats',{p_rdc:RDC});
+  document.getElementById('homeKpis').innerHTML=`
+    <div class="kpi"><div class="lbl">Stock Bagus</div><div class="val">${fmt(d.stock_good)} <small>box</small></div></div>
+    <div class="kpi ${Number(d.stock_damaged)>0?'alert':''}"><div class="lbl">Stock Rusak</div><div class="val">${fmt(d.stock_damaged)} <small>box</small></div></div>
+    <div class="kpi"><div class="lbl">Kavling Terpakai</div><div class="val">${fmt(d.kavling_used)} <small>/ ${fmt(d.kavling_total)}</small></div></div>
+    <div class="kpi"><div class="lbl">Rimpil</div><div class="val">${fmt(d.rimpil_count)} <small>kavling</small></div></div>`;
+  const rec=d.recent||[];
+  document.getElementById('homeRecent').innerHTML = rec.length? rec.map(r=>`
+    <div class="lrow"><div class="g"><div class="t">${esc(r.txn_type)}${r.txn_subtype?' · '+esc(r.txn_subtype):''}</div>
+    <div class="s">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''} · ${esc(r.waktu)} · ${esc(r.created_by||'')}</div></div>
+    <div class="n">${fmt(r.qty)}</div></div>`).join('')
+    : `<div style="padding:14px 0" class="muted">Belum ada transaksi. Mulai dari Putaway atau Picking.</div>`;
+}
+
+// ---------- picking ----------
+document.getElementById('rkFile').addEventListener('change',e=>{ if(e.target.files.length) readRK(e.target.files[0]); e.target.value=''; });
+function readRK(file){
+  const out=document.getElementById('pickOut');
+  out.innerHTML='<div class="card muted">⏳ Membaca file…</div>';
+  const fr=new FileReader();
+  fr.onload=async ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary',cellDates:true});
+      const lines=parseRK(wb);
+      if(!lines.length){out.innerHTML='<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">File tidak dikenali sebagai RK Final. Pastikan ada kolom SO No, Material, Batch No, dan ODO Qty.</div>';return;}
+      out.innerHTML='<div class="card muted">⏳ Mencocokkan '+lines.length+' baris dengan stock…</div>';
+      PICK_LINES=lines;
+      const res=await rpc('wms_validate_picklist',{p_rdc:RDC,p_lines:lines});
+      renderPick(res,file.name);
+    }catch(err){ out.innerHTML='<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal membaca: '+esc(err.message)+'</div>'; }
+  };
+  fr.readAsBinaryString(file);
+}
+// RK layout: driver name on a near-empty row, then a "SO No" header, then lines.
+function parseRK(wb){
+  const out=[];
+  wb.SheetNames.forEach(sn=>{
+    const g=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null,raw:true,cellDates:true});
+    let truck=null;
+    g.forEach(row=>{
+      if(!row) return;
+      const c0=row[0];
+      const filled=row.filter(v=>v!==null&&v!==''&&v!==undefined).length;
+      if(c0!=null&&String(c0).trim()==='SO No') return;
+      if(c0!=null&&filled<=2){ truck=String(c0).trim(); return; }
+      if(c0==null) return;
+      const qty=Number(row[6]);
+      if(!isFinite(qty)||qty<=0) return;
+      const mat=row[3]!=null?String(row[3]).trim():null;
+      if(!mat) return;
+      out.push({truck:truck||'(tanpa nama)',so_no:String(c0),material:mat,
+                batch:row[5]!=null?String(row[5]).trim():'',qty:qty});
+    });
+  });
+  return out;
+}
+function renderPick(rows,fname){
+  const ok=rows.filter(r=>r.status==='OK').length, bad=rows.length-ok;
+  const byTruck={};
+  rows.forEach(r=>{(byTruck[r.truck]=byTruck[r.truck]||[]).push(r);});
+  let h=`<div class="card" style="display:flex;gap:8px;align-items:center;padding:11px 14px">
+    <div style="flex:1"><div style="font-weight:650;font-size:13.5px">${esc(fname)}</div>
+    <div class="muted" style="font-size:12px">${rows.length} baris · ${Object.keys(byTruck).length} mobil</div></div>
+    <span class="pill p-ok">${ok} OK</span>${bad?`<span class="pill p-stop">${bad} SALAH</span>`:''}</div>`;
+  Object.keys(byTruck).forEach(t=>{
+    h+=`<div class="truck"><span class="plate">${esc(t)}</span><span class="cnt">${byTruck[t].length} baris</span></div>`;
+    byTruck[t].forEach(r=>{
+      const cls=r.status==='OK'?'':(r.status==='KURANG'?'warn':'stop');
+      let strip='';
+      if(r.pick_plan){
+        strip='<div class="tk-strip">'+r.pick_plan.split(' + ').map((p,i)=>{
+          const rimpil=/\(rimpil\)/.test(p);
+          const clean=p.replace(' (rimpil)','');
+          const [loc,q]=clean.split(':');
+          return `<div class="stepline"><div class="stepno">${i+1}</div><div class="loc">${esc(loc)}</div>
+            ${rimpil?'<span class="tag-rimpil">RIMPIL</span>':''}<div class="stepqty">${esc(q)}</div></div>`;
+        }).join('')+'</div>';
+      }
+      h+=`<div class="ticket ${cls}">
+        <div class="tk-top"><div class="m"><div class="tk-mat">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
+        <div class="tk-desc">${esc(r.so_no||'')}</div></div>
+        <div class="tk-qty"><b>${fmt(r.qty_requested)}</b><span>BOX</span></div></div>
+        ${strip}<div class="tk-note">${esc(r.catatan||'')}</div></div>`;
+    });
+  });
+  h+=ok?`<div style="height:8px"></div><button class="btn brand" id="execPick">Jalankan ${ok} baris yang OK</button>
+    <p class="muted" style="text-align:center;margin:10px 0 0;font-size:12px">Baris bermasalah tidak ikut diproses.</p>`
+   :`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg);margin-top:8px">Tidak ada baris yang bisa dijalankan. Perbaiki RK Final dulu.</div>`;
+  document.getElementById('pickOut').innerHTML=h;
+  const b=document.getElementById('execPick');
+  if(b) b.onclick=async()=>{
+    b.disabled=true;b.textContent='⏳ Menjalankan…';
+    try{
+      const res=await rpc('wms_execute_picklist',{p_rdc:RDC,p_lines:PICK_LINES,p_reference:fname});
+      document.getElementById('pickOut').innerHTML=
+        `<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
+          <div style="font-weight:650;color:var(--ok)">${res.applied} baris tersimpan sebagai Stock Out.</div>
+          <div class="muted" style="margin-top:4px">${res.skipped} baris dilewati karena bermasalah.</div></div>`;
+      loadHome(); loadStock();
+    }catch(e){ b.disabled=false;b.textContent='Coba lagi';
+      document.getElementById('pickOut').insertAdjacentHTML('afterbegin',
+        `<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
+  };
+}
+
+// ---------- putaway ----------
+document.getElementById('puFind').addEventListener('click',async()=>{
+  const mat=document.getElementById('puMat').value.trim().toUpperCase();
+  const batch=document.getElementById('puBatch').value.trim();
+  const qty=parseFloat(document.getElementById('puQty').value);
+  const msg=document.getElementById('puMsg'); msg.textContent='';
+  if(!mat||!isFinite(qty)||qty<=0){msg.style.color='var(--stop)';msg.textContent='Material dan qty wajib diisi.';return;}
+  try{
+    const res=await rpc('wms_suggest_putaway',{p_rdc:RDC,p_material:mat,p_qty:qty,p_batch:batch});
+    let h='<div class="eyebrow">Saran lokasi</div>';
+    res.forEach(r=>{
+      if(!r.kavling_id){ h+=`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">
+        <div style="font-weight:650;color:var(--stop)">${fmt(r.qty_to_place)} box belum dapat lokasi</div>
+        <div class="muted" style="margin-top:4px">${esc(r.reason)}</div></div>`; return; }
+      const pct=r.kapasitas?Math.min(100,Math.round(r.terisi/r.kapasitas*100)):0;
+      h+=`<div class="ticket"><div class="tk-top"><div class="m">
+        <div class="tk-mat">${esc(r.location_code)}</div>
+        <div class="tk-desc">Terisi ${fmt(r.terisi)} / ${fmt(r.kapasitas)} box · sisa ${fmt(r.sisa)}</div></div>
+        <div class="tk-qty"><b>${fmt(r.qty_to_place)}</b><span>BOX</span></div></div>
+        <div class="tk-strip"><div class="bar ${pct>=90?'full':pct>=70?'high':''}"><i style="width:${pct}%"></i></div>
+        <div class="muted" style="font-size:12px;margin-top:7px">${esc(r.reason)}</div>
+        <button class="btn brand" style="margin-top:10px" onclick="doPut(${r.kavling_id},'${esc(mat)}','${esc(batch)}',${r.qty_to_place})">
+          Simpan ke ${esc(r.location_code)}</button></div></div>`;
+    });
+    document.getElementById('puOut').innerHTML=h;
+  }catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}
+});
+async function doPut(kav,mat,batch,qty){
+  try{
+    await rpc('wms_move',{p_txn_type:'STOCK_IN',p_material:mat,p_qty:qty,p_batch:batch,
+      p_txn_subtype:document.getElementById('puType').value,p_to_kavling:kav,p_to_status:'GOOD'});
+    document.getElementById('puOut').innerHTML=
+      `<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
+        <div style="font-weight:650;color:var(--ok)">${fmt(qty)} box tersimpan.</div></div>`;
+    loadHome(); loadStock(); loadLoc();
+  }catch(e){ document.getElementById('puOut').insertAdjacentHTML('afterbegin',
+      `<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
+}
+
+// ---------- stock ----------
+let stTimer;
+document.getElementById('stSearch').addEventListener('input',()=>{clearTimeout(stTimer);stTimer=setTimeout(loadStock,300);});
+async function loadStock(){
+  const q=document.getElementById('stSearch').value.trim();
+  try{
+    const rows=await rpc('wms_stock_list',{p_rdc:RDC,p_search:q,p_limit:100});
+    document.getElementById('stOut').innerHTML = rows.length
+      ? `<div class="card" style="padding:4px 14px">`+rows.map(r=>`
+        <div class="lrow"><div class="g"><div class="t">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
+        <div class="s">${esc(r.location_code)}${r['desc']?' · '+esc(r['desc']):''}</div></div>
+        <div style="text-align:right"><div class="n">${fmt(r.qty)}</div>
+        <span class="pill ${r.status==='DAMAGED'?'p-stop':r.rimpil?'p-warn':'p-ok'}">${r.status==='DAMAGED'?'RUSAK':r.rimpil?'RIMPIL':'BAGUS'}</span></div></div>`).join('')+`</div>`
+      : `<div class="card muted">Belum ada stock${q?' untuk pencarian ini':''}.</div>`;
+  }catch(e){ document.getElementById('stOut').innerHTML=`<div class="card muted">Gagal memuat: ${esc(e.message)}</div>`; }
+}
+
+// ---------- lokasi ----------
+async function loadLoc(){
+  try{
+    const rows=await rpc('wms_location_list',{p_rdc:RDC});
+    document.getElementById('locOut').innerHTML = rows.length
+      ? `<div class="card" style="padding:4px 14px">`+rows.map(r=>{
+        const pct=r.kapasitas?Math.min(100,Math.round(r.terisi/r.kapasitas*100)):0;
+        return `<div class="lrow"><div class="g"><div class="t">${esc(r.location_code)}</div>
+        <div class="s">${fmt(r.terisi)} / ${fmt(r.kapasitas)} box${r.n_material?' · '+r.n_material+' material':' · kosong'}</div>
+        <div class="bar ${pct>=90?'full':pct>=70?'high':''}"><i style="width:${pct}%"></i></div></div>
+        <div class="n">${pct}%</div></div>`;}).join('')+`</div>`
+      : `<div class="card muted">Belum ada kavling. Tambahkan di bawah.</div>`;
+  }catch(e){ document.getElementById('locOut').innerHTML=`<div class="card muted">Gagal memuat: ${esc(e.message)}</div>`; }
+}
+document.getElementById('nlSave').addEventListener('click',async()=>{
+  const wh=document.getElementById('nlWh').value.trim().toUpperCase();
+  const bl=document.getElementById('nlBlock').value.trim().toUpperCase();
+  const li=document.getElementById('nlLine').value.trim().toUpperCase();
+  const kv=document.getElementById('nlKav').value.trim().toUpperCase();
+  const kap=parseFloat(document.getElementById('nlKap').value)||null;
+  const luas=parseFloat(document.getElementById('nlLuas').value)||null;
+  const msg=document.getElementById('nlMsg'); msg.style.color='var(--stop)';
+  if(!wh||!bl||!kv){msg.textContent='Gudang, Block, dan Kavling wajib diisi.';return;}
+  msg.style.color='var(--muted)'; msg.textContent='Menyimpan…';
+  try{
+    const whId=await rpc('wms_upsert_location',{p_level:'warehouse',p_rdc_name:RDC,p_code:wh,p_name:'Gudang '+wh});
+    const blId=await rpc('wms_upsert_location',{p_level:'block',p_parent_id:whId,p_code:bl});
+    let lineId=null;
+    if(li) lineId=await rpc('wms_upsert_location',{p_level:'line',p_parent_id:blId,p_code:li});
+    await rpc('wms_upsert_location',{p_level:'kavling',p_parent_id:blId,p_line_id:lineId,p_code:kv,
+      p_kapasitas:kap,p_luas_m2:luas});
+    msg.style.color='var(--ok)'; msg.textContent='✓ Kavling tersimpan.';
+    ['nlKav'].forEach(id=>document.getElementById(id).value='');
+    loadLoc(); loadHome();
+  }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
+});
+
+// ================= OPNAME HARIAN =================
+document.getElementById('opLoad').addEventListener('click',loadOpname);
+let OP_ROWS=[];
+async function loadOpname(){
+  const days=parseInt(document.getElementById('opDays').value);
+  const out=document.getElementById('opOut');
+  out.innerHTML='<div class="card muted">⏳ Memuat…</div>';
+  try{
+    OP_ROWS=await rpc('wms_opname_candidates',{p_rdc:RDC,p_days:days});
+    if(!OP_ROWS.length){
+      out.innerHTML='<div class="card muted">Tidak ada barang yang bergerak dalam rentang ini. Tidak perlu opname harian.</div>';
+      loadOpPending(); return;
+    }
+    out.innerHTML=`<div class="card" style="padding:4px 14px">`+OP_ROWS.map((r,i)=>`
+      <div class="lrow"><div class="g"><div class="t">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
+      <div class="s">${esc(r.location_code)} · sistem ${fmt(r.qty_system)} box · gerak ${esc(r.last_move||'')}</div></div>
+      <div style="width:96px"><input inputmode="numeric" data-i="${i}" class="opQty" placeholder="fisik"
+        style="padding:9px;text-align:right;font-family:var(--mono)"></div></div>`).join('')+`</div>
+      <button class="btn brand" id="opSave" style="margin-top:10px">Simpan hasil hitung</button>
+      <p class="muted" style="text-align:center;font-size:12px;margin:8px 0 0">Kosongkan yang tidak dihitung. Selisih perlu persetujuan RDC Manager.</p>`;
+    document.getElementById('opSave').onclick=submitOpname;
+  }catch(e){ out.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+  loadOpPending();
+}
+async function submitOpname(){
+  const lines=[];
+  document.querySelectorAll('.opQty').forEach(inp=>{
+    const v=inp.value.trim(); if(v==='') return;
+    const r=OP_ROWS[parseInt(inp.dataset.i)];
+    lines.push({kavling_id:r.kavling_id,material_code:r.material_code,batch:r.batch,
+                status:r.status,qty_system:r.qty_system,qty_physical:parseFloat(v)});
+  });
+  if(!lines.length){ alert('Belum ada jumlah fisik yang diisi.'); return; }
+  const b=document.getElementById('opSave'); b.disabled=true; b.textContent='⏳ Menyimpan…';
+  try{
+    const res=await rpc('wms_opname_submit',{p_rdc:RDC,p_lines:lines});
+    document.getElementById('opOut').innerHTML=
+      `<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
+       <div style="font-weight:650;color:var(--ok)">${res.saved} baris tersimpan.</div>
+       <div class="muted" style="margin-top:4px">${esc(res.note)}</div></div>`;
+    loadOpPending();
+  }catch(e){ b.disabled=false;b.textContent='Coba lagi';
+    document.getElementById('opOut').insertAdjacentHTML('afterbegin',
+      `<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
+}
+async function loadOpPending(){
+  const el=document.getElementById('opPending');
+  try{
+    const rows=await rpc('wms_opname_pending',{p_rdc:RDC});
+    if(!rows.length){ el.innerHTML=''; return; }
+    el.innerHTML=`<div class="eyebrow">Menunggu persetujuan</div>`+rows.map(r=>{
+      const neg=Number(r.selisih)<0;
+      return `<div class="ticket ${neg?'stop':'warn'}">
+        <div class="tk-top"><div class="m"><div class="tk-mat">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
+        <div class="tk-desc">${esc(r.location_code)} · ${esc(r.counted_by||'')} · ${esc(r.waktu||'')}</div></div>
+        <div class="tk-qty"><b>${Number(r.selisih)>0?'+':''}${fmt(r.selisih)}</b><span>SELISIH</span></div></div>
+        <div class="tk-strip"><div class="muted" style="font-size:12.5px">Sistem ${fmt(r.qty_system)} · Fisik ${fmt(r.qty_physical)}</div>
+        ${ROLE==='master'?`<div class="row" style="margin-top:10px">
+          <button class="btn" style="padding:10px" onclick="opDecide(${r.id},true)">Setujui</button>
+          <button class="btn ghost" style="padding:10px" onclick="opDecide(${r.id},false)">Tolak</button></div>`
+          :`<div class="muted" style="margin-top:8px;font-size:12.5px">Menunggu RDC Manager.</div>`}
+        </div></div>`;}).join('');
+  }catch(e){ el.innerHTML=''; }
+}
+async function opDecide(id,ok){
+  try{ await rpc('wms_opname_approve',{p_id:id,p_approve:ok}); loadOpPending(); loadHome(); loadStock(); }
+  catch(e){ alert('Gagal: '+e.message); }
+}
+
+// ================= BARANG RUSAK =================
+async function loadDamageForm(){
+  try{
+    const [reasons,locs]=await Promise.all([rpc('wms_damage_reasons',{}),rpc('wms_location_list',{p_rdc:RDC})]);
+    const opts=locs.map(l=>`<option value="${l.id}">${esc(l.location_code)}</option>`).join('');
+    document.getElementById('dmFrom').innerHTML=opts;
+    document.getElementById('dmTo').innerHTML=opts;
+    const rs=document.getElementById('dmReason');
+    rs.innerHTML=reasons.map(r=>`<option>${esc(r)}</option>`).join('');
+    rs.onchange=()=>{document.getElementById('dmOtherWrap').style.display=
+      /Lainnya/i.test(rs.value)?'block':'none';};
+  }catch(e){}
+}
+document.getElementById('dmSave').addEventListener('click',async()=>{
+  const msg=document.getElementById('dmMsg');
+  const mat=document.getElementById('dmMat').value.trim().toUpperCase();
+  const batch=document.getElementById('dmBatch').value.trim();
+  const qty=parseFloat(document.getElementById('dmQty').value);
+  const from=parseInt(document.getElementById('dmFrom').value);
+  const to=parseInt(document.getElementById('dmTo').value);
+  let reason=document.getElementById('dmReason').value;
+  if(/Lainnya/i.test(reason)){ const o=document.getElementById('dmOther').value.trim(); if(o) reason=o; }
+  msg.style.color='var(--stop)';
+  if(!mat||!isFinite(qty)||qty<=0||!from||!to){msg.textContent='Material, qty, dan kavling wajib diisi.';return;}
+  msg.style.color='var(--muted)'; msg.textContent='Menyimpan…';
+  try{
+    await rpc('wms_move',{p_txn_type:'DAMAGE',p_material:mat,p_qty:qty,p_batch:batch,
+      p_from_kavling:from,p_to_kavling:to,p_from_status:'GOOD',p_to_status:'DAMAGED',
+      p_damage_reason:reason,p_remarks:'Input dari WMS'});
+    msg.style.color='var(--ok)'; msg.textContent='✓ Tercatat sebagai barang rusak.';
+    document.getElementById('dmQty').value='';
+    loadHome(); loadStock();
+  }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
+});
+
+// ================= ARSIP =================
+async function loadArsip(){
+  const el=document.getElementById('arOut');
+  el.innerHTML='<div class="card muted">⏳ Memuat…</div>';
+  try{
+    const rows=await rpc('wms_archive_months',{p_rdc:RDC});
+    if(!rows.length){ el.innerHTML='<div class="card muted">Belum ada transaksi untuk diarsipkan.</div>'; return; }
+    el.innerHTML=rows.map(r=>`
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="flex:1"><div style="font-weight:650;font-family:var(--mono)">${esc(r.period)}</div>
+          <div class="muted" style="font-size:12.5px">${fmt(r.rows)} transaksi · ${fmt(r.total_qty)} box</div></div>
+          ${r.exported?'<span class="pill p-ok">SUDAH DIUNDUH</span>':'<span class="pill p-warn">BELUM</span>'}
+        </div>
+        <button class="btn ghost" style="margin-bottom:8px" onclick="arDownload('${esc(r.period)}')">⬇ Unduh Excel</button>
+        ${r.exported && r.purgeable && ROLE==='master'
+          ? `<button class="btn" style="background:var(--stop)" onclick="arPurge('${esc(r.period)}')">Hapus dari database</button>`
+          : `<div class="muted" style="font-size:12px">${!r.exported?'Unduh dulu sebelum bisa dihapus.':(!r.purgeable?'Belum boleh dihapus — data kurang dari 2 bulan.':'Hanya RDC Manager yang bisa menghapus.')}</div>`}
+      </div>`).join('');
+  }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+async function arDownload(period){
+  try{
+    const rows=await rpc('wms_archive_fetch',{p_rdc:RDC,p_period:period});
+    if(!rows.length){ alert('Tidak ada data.'); return; }
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Transaksi '+period);
+    XLSX.writeFile(wb,`WMS_${RDC}_${period}.xlsx`);
+    await rpc('wms_archive_mark',{p_rdc:RDC,p_period:period});
+    loadArsip();
+  }catch(e){ alert('Gagal: '+e.message); }
+}
+async function arPurge(period){
+  if(!confirm(`Hapus transaksi ${period} dari database?\n\nPastikan file Excel sudah tersimpan aman. Ringkasan bulanan tetap ada.`)) return;
+  try{ const r=await rpc('wms_archive_purge',{p_rdc:RDC,p_period:period});
+    alert(`${r.deleted_rows} baris dihapus.`); loadArsip(); loadHome(); }
+  catch(e){ alert('Gagal: '+e.message); }
+}
+
+// hook screen loads
+const _go=go;
+go=function(s){
+  _go(s);
+  if(s==='rusak') loadDamageForm();
+  if(s==='arsip') loadArsip();
+  if(s==='opname') loadOpPending();
+};
+
+</script></body></html>
