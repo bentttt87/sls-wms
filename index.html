@@ -291,9 +291,40 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 </div></section>
 
 
+
+<section class="screen" id="s-sap"><div class="wrap">
+  <div class="eyebrow">Upload Stock SAP</div>
+  <div class="hint">Stock TIDAK diinput manual. Semua berasal dari tarikan SAP. Upload → periksa → konfirmasi.</div>
+  <input type="file" id="sapFile" accept=".xlsx,.xls,.csv" style="display:none">
+  <button class="btn ghost" onclick="document.getElementById('sapFile').click()">📄 Pilih file Stock SAP…</button>
+  <div id="sapOut" style="margin-top:14px"></div>
+  <div class="eyebrow">Riwayat upload</div>
+  <div id="sapHist"></div>
+</div></section>
+
+<section class="screen" id="s-unloc"><div class="wrap">
+  <div class="eyebrow">Stock belum ada lokasi</div>
+  <div class="hint">Stock dari SAP yang belum ditentukan kavlingnya. Tekan salah satu untuk cari lokasi (putaway).</div>
+  <div id="unlocOut"></div>
+</div></section>
+
+
+<section class="screen" id="s-recon"><div class="wrap">
+  <div class="eyebrow">Validasi harian SAP vs WMS</div>
+  <div class="hint">Upload tarikan stock SAP pagi hari. Sistem hanya MEMBANDINGKAN — stock WMS tidak diubah.</div>
+  <input type="file" id="rcFile" accept=".xlsx,.xls,.csv,.txt" style="display:none">
+  <button class="btn ghost" onclick="document.getElementById('rcFile').click()">📄 Pilih tarikan SAP (Excel / txt)…</button>
+  <div id="rcOut" style="margin-top:14px"></div>
+  <div class="eyebrow">Riwayat validasi</div>
+  <div id="rcHist"></div>
+</div></section>
+
 <section class="screen" id="s-more"><div class="wrap">
   <div class="eyebrow">Menu lainnya</div>
   <div class="card" style="padding:4px 14px">
+    <div class="lrow" style="cursor:pointer" onclick="go('sap')"><div class="g"><div class="t">Upload Stock SAP</div><div class="s">Sumber semua stock awal</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('recon')"><div class="g"><div class="t">Validasi Harian SAP</div><div class="s">Bandingkan stock WMS vs SAP</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('unloc')"><div class="g"><div class="t">Stock Belum Ada Lokasi</div><div class="s">Perlu di-putaway ke kavling</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('rusak')"><div class="g"><div class="t">Catat Barang Rusak</div><div class="s">Pindahkan stock rusak + alasan</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('loc')"><div class="g"><div class="t">Master Lokasi</div><div class="s">Gudang, block, line, kavling</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('arsip')"><div class="g"><div class="t">Arsip Bulanan</div><div class="s">Unduh Excel &amp; bersihkan database</div></div><div class="n muted">›</div></div>
@@ -361,7 +392,7 @@ async function setupRdc(){
 }
 
 // ---------- screens ----------
-const SUB={home:'RDC · HARI INI',pick:'RK FINAL · PICKING',put:'BARANG MASUK',stock:'STOCK ON HAND',loc:'MASTER LOKASI',opname:'OPNAME HARIAN',rusak:'BARANG RUSAK',arsip:'ARSIP BULANAN',more:'MENU LAINNYA'};
+const SUB={home:'RDC · HARI INI',pick:'RK FINAL · PICKING',put:'BARANG MASUK',stock:'STOCK ON HAND',loc:'MASTER LOKASI'};
 function go(s){
   document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('on',e.id==='s-'+s));
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
@@ -719,5 +750,254 @@ go=function(s){
   if(s==='arsip') loadArsip();
   if(s==='opname') loadOpPending();
 };
+
+// ================= UPLOAD STOCK SAP =================
+let SAP_UPLOAD_ID=null;
+document.getElementById('sapFile').addEventListener('change',e=>{ if(e.target.files.length) readSAP(e.target.files[0]); e.target.value=''; });
+function readSAP(file){
+  const out=document.getElementById('sapOut');
+  out.innerHTML='<div class="card muted">⏳ Membaca file…</div>';
+  const fr=new FileReader();
+  fr.onload=async ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary',cellDates:true,FS:file.name.toLowerCase().endsWith('.txt')?'\t':undefined});
+      const rows=parseSAPStock(wb);
+      if(!rows.length){out.innerHTML='<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">File tidak dikenali. Perlu kolom Material, Storage Location, Unrestricted, dan Batch.</div>';return;}
+      out.innerHTML=`<div class="card muted">⏳ Memeriksa ${fmt(rows.length)} baris…</div>`;
+      const today=new Date().toISOString().slice(0,10);
+      const res=await rpc('wms_sap_stage',{p_rdc:RDC,p_filename:file.name,p_date:today,p_rows:rows});
+      SAP_UPLOAD_ID=res.upload_id;
+      out.innerHTML=`<div class="card">
+        <div style="font-weight:650;margin-bottom:10px">${esc(file.name)}</div>
+        <div class="kpis" style="grid-template-columns:1fr 1fr">
+          <div class="kpi"><div class="lbl">Baris</div><div class="val">${fmt(res.rows)}</div></div>
+          <div class="kpi"><div class="lbl">Material</div><div class="val">${fmt(res.materials)}</div></div>
+          <div class="kpi"><div class="lbl">Stock Bagus</div><div class="val">${fmt(res.qty_good)} <small>box</small></div></div>
+          <div class="kpi ${res.qty_damaged>0?'alert':''}"><div class="lbl">Rusak (RFB1)</div><div class="val">${fmt(res.qty_damaged)} <small>box</small></div></div>
+        </div>
+        ${res.errors>0?`<div class="tk-note stop" style="margin-top:10px;border-radius:8px">${fmt(res.errors)} baris tanpa kode material — akan dilewati.</div>`:''}
+        ${res.qty_transit>0?`<div class="muted" style="font-size:12px;margin-top:10px">Catatan: ${fmt(res.qty_transit)} box berstatus transit — belum masuk gudang, tidak diimpor.</div>`:''}
+        <button class="btn brand" id="sapRecon" style="margin-top:12px">Bandingkan dengan Stock WMS</button>
+        <div id="sapOpeningWrap" style="margin-top:8px;display:none">
+          <button class="btn ghost" id="sapConfirm">Jadikan Stock Awal (hanya sekali di awal)</button>
+          <p class="muted" style="font-size:12px;text-align:center;margin:8px 0 0">Hanya untuk pengisian pertama saat WMS masih kosong.</p>
+        </div>
+      </div>`;
+      try{ const kosong=await rpc('wms_is_empty',{p_rdc:RDC});
+        if(kosong) document.getElementById('sapOpeningWrap').style.display='block';
+      }catch(e){}
+      document.getElementById('sapRecon').onclick=runRecon;
+      document.getElementById('sapConfirm').onclick=async()=>{
+        const b=document.getElementById('sapConfirm'); b.disabled=true; b.textContent='⏳ Mengimpor…';
+        try{
+          const r=await rpc('wms_sap_import',{p_upload_id:SAP_UPLOAD_ID});
+          out.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
+            <div style="font-weight:650;color:var(--ok)">${fmt(r.baris_stock)} baris stock diimpor.</div>
+            <div class="muted" style="margin-top:4px">${fmt(r.belum_ada_lokasi)} baris belum ada lokasi — lanjutkan ke Putaway.</div>
+            <button class="btn" style="margin-top:12px" onclick="go('unloc')">Lihat stock belum ada lokasi</button></div>`;
+          loadHome(); loadStock(); loadSapHist();
+        }catch(e){ b.disabled=false;b.textContent='Coba lagi';
+          out.insertAdjacentHTML('afterbegin',`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
+      };
+      loadSapHist();
+    }catch(err){ out.innerHTML=`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal membaca: ${esc(err.message)}</div>`; }
+  };
+  fr.readAsBinaryString(file);
+}
+// SAP stock export: header row has Material / Storage Location / Unrestricted / Batch
+function parseSAPStock(wb){
+  for(const sn of wb.SheetNames){
+    const g=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null,raw:true});
+    if(!g.length) continue;
+    let hr=-1;
+    for(let i=0;i<Math.min(g.length,10);i++){
+      const h=(g[i]||[]).map(x=>String(x||'').trim().toLowerCase());
+      if(h.includes('material')&&(h.includes('unrestricted')||h.includes('stock'))){hr=i;break;}
+    }
+    if(hr<0) continue;
+    const H=(g[hr]||[]).map(x=>String(x||'').trim().toLowerCase());
+    const col=n=>H.indexOf(n);
+    const cM=col('material'), cD=col('material description'), cS=col('storage location'),
+          cU=col('base unit of measure'), cUn=col('unrestricted'), cQ=col('in quality insp.'),
+          cT=col('transit and transfer'), cB=col('batch'), cStock=col('stock');
+    const out=[];
+    for(let i=hr+1;i<g.length;i++){
+      const row=g[i]; if(!row) continue;
+      const m=row[cM]; if(m==null||String(m).trim()==='') continue;
+      const unres = cUn>=0 ? Number(row[cUn])||0 : (cStock>=0?Number(row[cStock])||0:0);
+      out.push({material:String(m).trim(), desc:cD>=0?String(row[cD]||''):'',
+        sloc:cS>=0?String(row[cS]||''):'', uom:cU>=0?String(row[cU]||'BOX'):'BOX',
+        unrestricted:unres, qc:cQ>=0?Number(row[cQ])||0:0,
+        transit:cT>=0?Number(row[cT])||0:0, batch:cB>=0?String(row[cB]||''):''});
+    }
+    if(out.length) return out;
+  }
+  return [];
+}
+async function loadSapHist(){
+  try{
+    const rows=await rpc('wms_sap_history',{p_rdc:RDC});
+    document.getElementById('sapHist').innerHTML = rows.length
+      ? `<div class="card" style="padding:4px 14px">`+rows.map(r=>`
+        <div class="lrow"><div class="g"><div class="t">${esc(r.filename||'-')}</div>
+        <div class="s">${esc(r.tanggal)} · ${fmt(r.rows)} baris · ${esc(r.by||'')} · ${esc(r.waktu)}</div></div>
+        <span class="pill ${r.status==='IMPORTED'?'p-ok':'p-warn'}">${r.status==='IMPORTED'?'DIIMPOR':'PREVIEW'}</span></div>`).join('')+`</div>`
+      : `<div class="card muted">Belum ada upload.</div>`;
+  }catch(e){}
+}
+async function loadUnloc(){
+  const el=document.getElementById('unlocOut');
+  el.innerHTML='<div class="card muted">⏳ Memuat…</div>';
+  try{
+    const rows=await rpc('wms_unlocated',{p_rdc:RDC,p_limit:200});
+    el.innerHTML = rows.length
+      ? `<div class="card" style="padding:4px 14px">`+rows.map(r=>`
+        <div class="lrow" style="cursor:pointer" onclick="prefillPutaway('${esc(r.material_code)}','${esc(r.batch)}',${r.qty})">
+        <div class="g"><div class="t">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
+        <div class="s">${esc(r['desc']||'')}</div></div>
+        <div style="text-align:right"><div class="n">${fmt(r.qty)}</div>
+        ${r.status==='DAMAGED'?'<span class="pill p-stop">RUSAK</span>':'<span class="pill p-warn">PERLU LOKASI</span>'}</div></div>`).join('')+`</div>`
+      : `<div class="card muted">Semua stock sudah punya lokasi.</div>`;
+  }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+function prefillPutaway(mat,batch,qty){
+  document.getElementById('puMat').value=mat;
+  document.getElementById('puBatch').value=batch;
+  document.getElementById('puQty').value=qty;
+  go('put');
+  document.getElementById('puFind').click();
+}
+
+const _go2=go;
+go=function(s){ _go2(s); if(s==='sap') loadSapHist(); if(s==='unloc') loadUnloc(); };
+
+
+// ================= REKONSILIASI SAP vs WMS =================
+async function runRecon(){
+  const b=document.getElementById('sapRecon'); b.disabled=true; b.textContent='⏳ Membandingkan…';
+  const out=document.getElementById('sapOut');
+  try{
+    const r=await rpc('wms_reconcile',{p_upload_id:SAP_UPLOAD_ID,p_limit:300});
+    const rows=r.baris||[];
+    out.innerHTML=`<div class="card">
+      <div style="font-weight:650;margin-bottom:10px">Hasil Validasi SAP vs WMS</div>
+      <div class="kpis" style="grid-template-columns:1fr 1fr">
+        <div class="kpi"><div class="lbl">Akurasi</div><div class="val">${r.akurasi}<small>%</small></div></div>
+        <div class="kpi ${r.selisih>0?'alert':''}"><div class="lbl">Baris Selisih</div><div class="val">${fmt(r.selisih)}</div></div>
+        <div class="kpi"><div class="lbl">Total SAP</div><div class="val">${fmt(r.qty_sap)} <small>box</small></div></div>
+        <div class="kpi"><div class="lbl">Total WMS</div><div class="val">${fmt(r.qty_wms)} <small>box</small></div></div>
+      </div>
+      <div class="muted" style="font-size:12.5px;margin-top:10px">${fmt(r.cocok)} baris cocok. Selisih total ${fmt(r.qty_selisih)} box.
+      Stock WMS <b>tidak diubah</b> — selisih ini untuk ditindaklanjuti tim.</div>
+    </div>`;
+    if(rows.length){
+      out.insertAdjacentHTML('beforeend',
+        `<div class="eyebrow">Daftar selisih</div><div class="card" style="padding:4px 14px">`+
+        rows.map(x=>`<div class="lrow"><div class="g">
+          <div class="t">${esc(x.material_code)}${x.batch?' · '+esc(x.batch):''}${x.status==='DAMAGED'?' · RUSAK':''}</div>
+          <div class="s">SAP ${fmt(x.qty_sap)} · WMS ${fmt(x.qty_wms)} — ${esc(x.keterangan)}</div></div>
+          <div class="n" style="color:${Number(x.selisih)<0?'var(--stop)':'var(--warn)'}">${Number(x.selisih)>0?'+':''}${fmt(x.selisih)}</div></div>`).join('')
+        +`</div><button class="btn ghost" id="reconXls" style="margin-top:10px">⬇ Unduh daftar selisih (Excel)</button>`);
+      document.getElementById('reconXls').onclick=()=>{
+        const wb=XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Selisih');
+        XLSX.writeFile(wb,`Selisih_SAP_WMS_${RDC}_${new Date().toISOString().slice(0,10)}.xlsx`);
+      };
+    } else {
+      out.insertAdjacentHTML('beforeend',
+        `<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
+         <div style="font-weight:650;color:var(--ok)">Semua cocok. Tidak ada selisih.</div></div>`);
+    }
+    loadSapHist();
+  }catch(e){ b.disabled=false; b.textContent='Coba lagi';
+    out.insertAdjacentHTML('afterbegin',`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
+}
+
+// ================= VALIDASI HARIAN SAP vs WMS =================
+document.getElementById('rcFile').addEventListener('change',e=>{ if(e.target.files.length) readRecon(e.target.files[0]); e.target.value=''; });
+function readRecon(file){
+  const out=document.getElementById('rcOut');
+  out.innerHTML='<div class="card muted">⏳ Membaca file…</div>';
+  const isTxt=/\.(txt|csv)$/i.test(file.name);
+  const fr=new FileReader();
+  fr.onload=async ev=>{
+    try{
+      const rows = isTxt ? parseSAPText(ev.target.result)
+                         : parseSAPStock(XLSX.read(ev.target.result,{type:'binary',cellDates:true}));
+      if(!rows.length){out.innerHTML='<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">File tidak dikenali. Perlu kolom Material, Storage Location, Unrestricted, Batch.</div>';return;}
+      out.innerHTML=`<div class="card muted">⏳ Membandingkan ${fmt(rows.length)} baris SAP dengan stock WMS…</div>`;
+      const r=await rpc('wms_reconcile',{p_rdc:RDC,p_filename:file.name,p_rows:rows});
+      renderRecon(r,file.name);
+      loadReconHist();
+    }catch(err){ out.innerHTML=`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(err.message)}</div>`; }
+  };
+  if(isTxt) fr.readAsText(file); else fr.readAsBinaryString(file);
+}
+// SAP .txt export: tab or pipe delimited, header row somewhere in the first lines
+function parseSAPText(txt){
+  const lines=txt.split(/\r?\n/).filter(l=>l.trim()!=='');
+  const delim = (lines[0]||'').includes('\t') ? '\t' : ((lines[0]||'').includes('|') ? '|' : ';');
+  let hr=-1, H=[];
+  for(let i=0;i<Math.min(lines.length,15);i++){
+    const c=lines[i].split(delim).map(s=>s.trim().toLowerCase().replace(/^"|"$/g,''));
+    if(c.includes('material')&&(c.includes('unrestricted')||c.includes('stock'))){hr=i;H=c;break;}
+  }
+  if(hr<0) return [];
+  const col=n=>H.indexOf(n);
+  const cM=col('material'),cD=col('material description'),cS=col('storage location'),
+        cU=col('base unit of measure'),cUn=col('unrestricted'),cQ=col('in quality insp.'),
+        cT=col('transit and transfer'),cB=col('batch'),cStock=col('stock');
+  const num=v=>Number(String(v||'').replace(/["\s]/g,'').replace(/\.(?=\d{3}\b)/g,'').replace(',','.'))||0;
+  const out=[];
+  for(let i=hr+1;i<lines.length;i++){
+    const c=lines[i].split(delim).map(s=>s.trim().replace(/^"|"$/g,''));
+    const m=c[cM]; if(!m) continue;
+    out.push({material:m,desc:cD>=0?c[cD]||'':'',sloc:cS>=0?c[cS]||'':'',
+      uom:cU>=0?c[cU]||'BOX':'BOX',
+      unrestricted:cUn>=0?num(c[cUn]):(cStock>=0?num(c[cStock]):0),
+      qc:cQ>=0?num(c[cQ]):0,transit:cT>=0?num(c[cT]):0,batch:cB>=0?c[cB]||'':''});
+  }
+  return out;
+}
+function renderRecon(r,fname){
+  const ok=Number(r.selisih_total)===0;
+  const det=r.detail||[];
+  document.getElementById('rcOut').innerHTML=`
+    <div class="card">
+      <div style="font-weight:650;margin-bottom:10px">${esc(fname)}</div>
+      <div class="kpis" style="grid-template-columns:1fr 1fr">
+        <div class="kpi"><div class="lbl">Stock SAP</div><div class="val">${fmt(r.sap_total)} <small>box</small></div></div>
+        <div class="kpi"><div class="lbl">Stock WMS</div><div class="val">${fmt(r.wms_total)} <small>box</small></div></div>
+        <div class="kpi ${ok?'':'alert'}"><div class="lbl">Selisih</div><div class="val">${Number(r.selisih_total)>0?'+':''}${fmt(r.selisih_total)} <small>box</small></div></div>
+        <div class="kpi"><div class="lbl">Akurasi</div><div class="val">${r.akurasi!=null?r.akurasi:'—'}<small>%</small></div></div>
+      </div>
+      <div class="muted" style="font-size:12.5px;margin-top:10px">
+        ${fmt(r.n_match)} cocok · ${fmt(r.n_variance)} selisih · ${fmt(r.n_hanya_sap)} hanya di SAP · ${fmt(r.n_hanya_wms)} hanya di WMS
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:6px">Stock WMS tidak diubah — ini hanya perbandingan.</div>
+    </div>
+    ${det.length?`<div class="eyebrow">Rincian selisih (${det.length} teratas)</div>
+      <div class="card" style="padding:4px 14px">`+det.map(d=>`
+        <div class="lrow"><div class="g"><div class="t">${esc(d.material)}${d.batch?' · '+esc(d.batch):''}</div>
+        <div class="s">SAP ${fmt(d.sap)} · WMS ${fmt(d.wms)}${d.status==='DAMAGED'?' · RUSAK':''}</div></div>
+        <div style="text-align:right"><div class="n" style="color:${Number(d.selisih)<0?'var(--stop)':'var(--warn)'}">${Number(d.selisih)>0?'+':''}${fmt(d.selisih)}</div>
+        <span class="pill ${d.jenis==='SELISIH'?'p-warn':'p-stop'}" style="font-size:9px">${d.jenis==='HANYA_DI_SAP'?'BELUM DI WMS':d.jenis==='HANYA_DI_WMS'?'TIDAK DI SAP':'SELISIH'}</span></div></div>`).join('')+`</div>`
+      :`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg);margin-top:10px">
+        <div style="font-weight:650;color:var(--ok)">Semua cocok — tidak ada selisih.</div></div>`}`;
+}
+async function loadReconHist(){
+  try{
+    const rows=await rpc('wms_recon_history',{p_rdc:RDC});
+    document.getElementById('rcHist').innerHTML = rows.length
+      ? `<div class="card" style="padding:4px 14px">`+rows.map(r=>`
+        <div class="lrow"><div class="g"><div class="t">${esc(r.tanggal)}</div>
+        <div class="s">SAP ${fmt(r.sap)} · WMS ${fmt(r.wms)} · ${esc(r.by||'')}</div></div>
+        <div style="text-align:right"><div class="n">${r.akurasi!=null?r.akurasi+'%':'—'}</div>
+        <span class="pill ${Number(r.selisih)===0?'p-ok':'p-warn'}" style="font-size:9px">${Number(r.selisih)===0?'COCOK':fmt(r.selisih)}</span></div></div>`).join('')+`</div>`
+      : `<div class="card muted">Belum ada validasi.</div>`;
+  }catch(e){}
+}
+const _go3=go;
+go=function(s){ _go3(s); if(s==='recon') loadReconHist(); };
 
 </script></body></html>
