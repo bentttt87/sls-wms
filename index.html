@@ -387,10 +387,48 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div id="syOut"></div>
 </div></section>
 
+
+<section class="screen" id="s-mmotif"><div class="wrap">
+  <div class="eyebrow">Master kode motif per block</div>
+  <div class="hint">Tentukan motif mana disimpan di block mana. Kode boleh sebagian (mis. <b>AGT602</b> mencakup semua motif berawalan itu). Aturan yang lebih spesifik menang.</div>
+  <div class="card">
+    <div><label>Kode motif / awalan</label><input id="mbKode" placeholder="AGT602 atau AGT602080CR"></div>
+    <div style="margin:10px 0"><label>Block tujuan</label><select id="mbBlock"></select></div>
+    <div style="margin-bottom:12px"><label>Keterangan (opsional)</label><input id="mbKet" placeholder="mis. Granit 60x60"></div>
+    <button class="btn" id="mbSave">Simpan aturan</button>
+    <div id="mbMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div class="card" style="margin-top:10px">
+    <div style="font-weight:650;font-size:13.5px;margin-bottom:6px">Impor dari file Master Material</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Mengisi otomatis aturan block, isi pallet, dan kapasitas kavling sekaligus.</div>
+    <input type="file" id="mmFile" accept=".xlsx,.xls,.csv" style="display:none">
+    <button class="btn ghost" onclick="document.getElementById('mmFile').click()">📄 Pilih file Master Material…</button>
+    <div id="mmMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div id="mbOut"></div>
+</div></section>
+
+<section class="screen" id="s-mpallet"><div class="wrap">
+  <div class="eyebrow">Master isi box per pallet</div>
+  <div class="hint">Dipakai untuk memecah putaway jadi kelipatan pallet utuh. Kode boleh sebagian.</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Kode motif / awalan</label><input id="pmKode" placeholder="AGT602"></div>
+      <div style="max-width:130px"><label>Box per pallet</label><input id="pmBox" inputmode="numeric" placeholder="40"></div>
+    </div>
+    <div style="margin-bottom:12px"><label>Keterangan (opsional)</label><input id="pmKet" placeholder="mis. Granit 60x60"></div>
+    <button class="btn" id="pmSave">Simpan</button>
+    <div id="pmMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div id="pmOut"></div>
+</div></section>
+
 <section class="screen" id="s-more"><div class="wrap">
   <div class="eyebrow">Menu lainnya</div>
   <div class="card" style="padding:4px 14px">
     <div class="lrow" style="cursor:pointer" onclick="go('sap')"><div class="g"><div class="t">Upload Stock SAP</div><div class="s">Sumber semua stock awal</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('mmotif')"><div class="g"><div class="t">Master Kode Motif</div><div class="s">Motif ditaruh di block mana</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('mpallet')"><div class="g"><div class="t">Master Isi Pallet</div><div class="s">Box per pallet</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('sync')"><div class="g"><div class="t">Selaraskan dengan SAP</div><div class="s">Perlu persetujuan RDC Manager</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('transfer')"><div class="g"><div class="t">Pindah Lokasi Barang</div><div class="s">Mutasi antar kavling</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('tasks')"><div class="g"><div class="t">Tugas Picking</div><div class="s">Draft, revisi, eksekusi</div></div><div class="n muted">›</div></div>
@@ -586,14 +624,14 @@ function renderPick(rows,fname){
 }
 let PICK_RESULT=null;
 function downloadPickList(fname){
-  const aoa=[['Mobil','SO','Motif','Kode Material','Seri','Gudang','Block','Kavling','Kode Lokasi','Qty Ambil','Rimpil','Status']];
+  const aoa=[['Mobil','SO','Motif','Kode Material','Seri','Qty Ambil','Gudang','Block','Kavling','Kode Lokasi','Rimpil','Status']];
   (PICK_RESULT||[]).forEach(r=>{
     if(!(r.steps||[]).length){
-      aoa.push([r.truck,r.so_no,r.motif,r.material_code,r.batch,'','','','',r.qty_requested,'',r.status+' \u2014 '+(r.catatan||'')]);
+      aoa.push([r.truck,r.so_no,r.motif,r.material_code,r.batch,r.qty_requested,'','','','','',r.status+' \u2014 '+(r.catatan||'')]);
       return;
     }
-    r.steps.forEach(s=>aoa.push([r.truck,r.so_no,r.motif,r.material_code,r.batch,
-      s.gudang,s.block,s.kavling,s.location_code,s.qty,s.rimpil?'RIMPIL':'',r.status]));
+    r.steps.forEach(s=>aoa.push([r.truck,r.so_no,r.motif,r.material_code,r.batch,s.qty,
+      s.gudang,s.block,s.kavling,s.location_code,s.rimpil?'RIMPIL':'',r.status]));
   });
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),'Daftar Picking');
@@ -616,9 +654,9 @@ document.getElementById('puFind').addEventListener('click',async()=>{
         <div class="muted" style="margin-top:4px">${esc(r.reason)}</div></div>`; return; }
       const pct=r.kapasitas?Math.min(100,Math.round(r.terisi/r.kapasitas*100)):0;
       h+=`<div class="ticket"><div class="tk-top"><div class="m">
-        <div class="tk-mat">${esc(r.location_code)}</div>
-        <div class="tk-desc">Terisi ${fmt(r.terisi)} / ${fmt(r.kapasitas)} box · sisa ${fmt(r.sisa)}</div></div>
-        <div class="tk-qty"><b>${fmt(r.qty_to_place)}</b><span>BOX</span></div></div>
+        <div class="tk-mat">${r.gudang?esc(r.gudang)+' · '+esc(r.block)+' · ':''}${esc(r.location_code)}</div>
+        <div class="tk-desc">Terisi ${fmt(r.terisi)} / ${fmt(r.kapasitas)} box · sisa ${fmt(r.sisa)}${r.sesuai_master?' · sesuai master motif':''}</div></div>
+        <div class="tk-qty"><b>${fmt(r.qty_to_place)}</b><span>${r.pallet?fmt(r.pallet)+' PALLET':'BOX'}</span></div></div>
         <div class="tk-strip"><div class="bar ${pct>=90?'full':pct>=70?'high':''}"><i style="width:${pct}%"></i></div>
         <div class="muted" style="font-size:12px;margin-top:7px">${esc(r.reason)}</div>
         <button class="btn brand" style="margin-top:10px" onclick="doPut(${r.kavling_id},'${esc(mat)}','${esc(batch)}',${r.qty_to_place})">
@@ -1542,6 +1580,145 @@ async function cekStock(mat, batch){
     </div>`;
     box.scrollIntoView({behavior:'smooth',block:'nearest'});
   }catch(e){ box.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+
+// ================= MASTER KODE MOTIF PER BLOCK =================
+async function loadMotifBlock(){
+  try{
+    const [rows,locs]=await Promise.all([
+      rpc('wms_motif_block_list',{p_rdc:RDC}),
+      rpc('wms_location_list',{p_rdc:RDC})]);
+    // build block dropdown from distinct gudang+block of existing kavling
+    const seen={};
+    locs.forEach(l=>{ const c=(l.location_code||'').split('-');
+      if(c.length>=3){ const key=c[1]+'|'+c.slice(2,c.length-1).join('-'); seen[key]=seen[key]||{gud:c[1],blk:c.slice(2,c.length-1).join('-')}; }});
+    const blocks=await rpc('wms_block_options',{p_rdc:RDC}).catch(()=>null);
+    const sel=document.getElementById('mbBlock');
+    if(blocks && blocks.length){
+      sel.innerHTML=blocks.map(b=>`<option value="${b.block_id}">${esc(b.gudang)} · ${esc(b.block)} (${b.jml_kavling} kavling)</option>`).join('');
+    }
+    document.getElementById('mbOut').innerHTML = rows.length
+      ? '<div class="eyebrow">Aturan tersimpan</div><div class="card" style="padding:4px 14px">'+rows.map(r=>`
+        <div class="lrow"><div class="g"><div class="t">${esc(r.kode_motif)}</div>
+        <div class="s">→ ${esc(r.gudang)} · ${esc(r.block)} (${r.jml_kavling} kavling)${r.keterangan?' · '+esc(r.keterangan):''}</div></div>
+        <button class="btn ghost" style="width:auto;padding:6px 10px;font-size:12px" onclick="mbToggle(${r.id},${r.active?'false':'true'})">${r.active?'Nonaktifkan':'Aktifkan'}</button></div>`).join('')+'</div>'
+      : '<div class="card muted">Belum ada aturan. Tambahkan di atas.</div>';
+  }catch(e){ document.getElementById('mbOut').innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+document.getElementById('mbSave').addEventListener('click',async()=>{
+  const msg=document.getElementById('mbMsg');
+  const kode=document.getElementById('mbKode').value.trim();
+  const blk=parseInt(document.getElementById('mbBlock').value);
+  if(!kode||!blk){msg.style.color='var(--stop)';msg.textContent='Kode motif dan block wajib diisi.';return;}
+  msg.style.color='var(--muted)'; msg.textContent='Menyimpan…';
+  try{
+    await rpc('wms_motif_block_save',{p_rdc:RDC,p_kode:kode,p_block_id:blk,
+      p_keterangan:document.getElementById('mbKet').value.trim()||null});
+    msg.style.color='var(--ok)'; msg.textContent='✓ Aturan tersimpan.';
+    document.getElementById('mbKode').value=''; document.getElementById('mbKet').value='';
+    loadMotifBlock();
+  }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
+});
+async function mbToggle(id,active){
+  try{ await rpc('wms_motif_block_save',{p_rdc:RDC,p_kode:null,p_block_id:null,p_id:id,p_active:active}); loadMotifBlock(); }
+  catch(e){ alert('Gagal: '+e.message); }
+}
+
+// ================= MASTER ISI PALLET =================
+async function loadPallet(){
+  try{
+    const rows=await rpc('wms_pallet_list',{p_rdc:RDC});
+    document.getElementById('pmOut').innerHTML = rows.length
+      ? '<div class="eyebrow">Tersimpan</div><div class="card" style="padding:4px 14px">'+rows.map(r=>`
+        <div class="lrow"><div class="g"><div class="t">${esc(r.kode_motif)}</div>
+        <div class="s">${r.keterangan?esc(r.keterangan):'—'}</div></div>
+        <div style="text-align:right"><div class="n">${fmt(r.box_per_pallet)}</div>
+        <div class="s" style="font-size:10px">box/pallet</div></div></div>`).join('')+'</div>'
+      : '<div class="card muted">Belum ada data. Tambahkan di atas.</div>';
+  }catch(e){ document.getElementById('pmOut').innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+document.getElementById('pmSave').addEventListener('click',async()=>{
+  const msg=document.getElementById('pmMsg');
+  const kode=document.getElementById('pmKode').value.trim();
+  const box=parseFloat(document.getElementById('pmBox').value);
+  if(!kode||!isFinite(box)||box<=0){msg.style.color='var(--stop)';msg.textContent='Kode motif dan isi box wajib diisi.';return;}
+  msg.style.color='var(--muted)'; msg.textContent='Menyimpan…';
+  try{
+    await rpc('wms_pallet_save',{p_rdc:RDC,p_kode:kode,p_box:box,
+      p_keterangan:document.getElementById('pmKet').value.trim()||null});
+    msg.style.color='var(--ok)'; msg.textContent='✓ Tersimpan.';
+    document.getElementById('pmKode').value=''; document.getElementById('pmBox').value='';
+    document.getElementById('pmKet').value=''; loadPallet();
+  }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
+});
+['mbKode','pmKode'].forEach(id=>{const el=document.getElementById(id);
+  if(el){el.style.textTransform='uppercase';
+    el.addEventListener('input',()=>{const p=el.selectionStart;el.value=el.value.toUpperCase();try{el.setSelectionRange(p,p);}catch(e){}});}});
+const _go7=go;
+go=function(s){ _go7(s); if(s==='mmotif') loadMotifBlock(); if(s==='mpallet') loadPallet(); };
+
+// ================= IMPOR MASTER MATERIAL (dari file RDC) =================
+document.getElementById('mmFile').addEventListener('change',e=>{ if(e.target.files.length) readMasterMotif(e.target.files[0]); e.target.value=''; });
+function readMasterMotif(file){
+  const msg=document.getElementById('mmMsg');
+  msg.style.color='var(--muted)'; msg.textContent='⏳ Membaca file…';
+  const fr=new FileReader();
+  fr.onload=async ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
+      const rows=parseMasterMotif(wb);
+      if(!rows.length){msg.style.color='var(--stop)';
+        msg.textContent='File tidak dikenali. Perlu kolom Master Motif, Jml Box / Pallet, Gudang, Block.';return;}
+      msg.textContent=`⏳ Mengimpor ${rows.length} baris…`;
+      const r=await rpc('wms_import_master_motif',{p_rdc:RDC,p_rows:rows});
+      msg.style.color='var(--ok)';
+      msg.innerHTML=`✓ ${fmt(r.aturan_block)} aturan block · ${fmt(r.aturan_pallet)} aturan pallet`
+        +(r.block_baru?` · ${fmt(r.block_baru)} block baru dibuat`:'')
+        +(r.dilewati?` · ${fmt(r.dilewati)} dilewati`:'');
+      loadMotifBlock(); loadPallet();
+    }catch(err){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+err.message; }
+  };
+  fr.readAsBinaryString(file);
+}
+function parseMasterMotif(wb){
+  for(const sn of wb.SheetNames){
+    const g=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null,raw:true});
+    // The sheet has a note line that also contains the words "Master Motif",
+    // so require the real header row to ALSO carry a box/pallet or gudang column.
+    let hr=-1;
+    for(let i=0;i<Math.min(g.length,15);i++){
+      const h=(g[i]||[]).map(x=>String(x||'').trim().toLowerCase());
+      const hasKode=h.some(v=>v==='master motif'||(v.includes('master motif')&&v.length<20));
+      const hasMore=h.some(v=>v.includes('box'))||h.some(v=>v.includes('gudang'))||h.some(v=>v.includes('lokasi'));
+      if(hasKode&&hasMore){hr=i;break;}
+    }
+    if(hr<0) continue;
+    const H=(g[hr]||[]).map(x=>String(x||'').trim().toLowerCase());
+    const find=frag=>H.findIndex(v=>v.includes(frag));
+    const cK=find('master motif'), cBox=find('box'), cKap=find('total box'),
+          cG=find('gudang'), cB=find('block');
+    // Gudang/Block may sit on the row BELOW (merged header) — scan next row too
+    let gg=cG, bb=cB;
+    if(gg<0||bb<0){
+      const H2=(g[hr+1]||[]).map(x=>String(x||'').trim().toLowerCase());
+      if(gg<0) gg=H2.findIndex(v=>v.includes('gudang'));
+      if(bb<0) bb=H2.findIndex(v=>v.includes('block'));
+    }
+    const out=[];
+    for(let i=hr+1;i<g.length;i++){
+      const r=g[i]; if(!r) continue;
+      const kode=cK>=0&&r[cK]!=null?String(r[cK]).trim():'';
+      if(!kode||kode.toLowerCase().includes('master motif')) continue;
+      out.push({kode,
+        box_pallet: cBox>=0&&r[cBox]!=null?String(r[cBox]):null,
+        total_box_kavling: cKap>=0&&r[cKap]!=null?String(r[cKap]):null,
+        gudang: gg>=0&&r[gg]!=null?String(r[gg]).trim():'',
+        block: bb>=0&&r[bb]!=null?String(r[bb]).trim():'',
+        keterangan: null});
+    }
+    if(out.length) return out;
+  }
+  return [];
 }
 
 </script></body></html>
