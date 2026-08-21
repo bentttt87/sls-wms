@@ -202,6 +202,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div class="hint">Upload RK Final → sistem cek ke stock asli → tandai yang salah sebelum barang naik mobil.</div>
   <input type="file" id="rkFile" accept=".ods,.xlsx,.xls" style="display:none">
   <button class="btn ghost" onclick="document.getElementById('rkFile').click()">📄 Pilih file RK Final…</button>
+  <div id="pickCek" style="display:none;margin-top:12px"></div>
   <div id="pickOut" style="margin-top:14px"></div>
 </div></section>
 
@@ -225,8 +226,26 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 
 <section class="screen" id="s-stock"><div class="wrap">
   <div class="eyebrow">Cari stock</div>
-  <input id="stSearch" placeholder="Kode material, series, atau kavling…" style="margin-bottom:12px">
+  <div class="row" style="margin-bottom:8px">
+    <div><label>Motif / Kode</label><input id="fMotif" placeholder="mis. Ginza"></div>
+    <div style="max-width:120px"><label>Seri</label><input id="fSeri" placeholder="S12S"></div>
+  </div>
+  <div class="row" style="margin-bottom:8px">
+    <div><label>Gudang</label><input id="fGudang" placeholder="B"></div>
+    <div><label>Block</label><input id="fBlock" placeholder="A"></div>
+    <div><label>Kavling</label><input id="fKav" placeholder="15"></div>
+  </div>
+  <div class="row" style="margin-bottom:10px">
+    <div><label>Status</label><select id="fStatus"><option value="">Semua</option><option value="GOOD">Bagus</option><option value="DAMAGED">Rusak</option><option value="HOLD">Hold</option></select></div>
+    <div style="display:flex;align-items:flex-end;gap:8px">
+      <button class="btn" id="stGo" style="padding:12px">Cari</button>
+      <button class="btn ghost" id="stClear" style="padding:12px">Reset</button>
+    </div>
+  </div>
+  <div id="stSummary" class="muted" style="font-size:12.5px;margin-bottom:8px"></div>
   <div id="stOut"></div>
+  <div id="stPager" style="display:flex;gap:8px;margin-top:10px"></div>
+  <div id="stAdmin" style="margin-top:16px"></div>
 </div></section>
 
 <section class="screen" id="s-loc"><div class="wrap">
@@ -542,7 +561,11 @@ function renderPick(rows,fname){
           <div class="tk-desc">${esc(r.material_code)}${r.batch?' \u00b7 Seri '+esc(r.batch):''}${r.so_no?' \u00b7 SO '+esc(r.so_no):''}</div>
         </div>
         <div class="tk-qty"><b>${fmt(r.qty_requested)}</b><span>BOX</span></div></div>
-        ${strip}<div class="tk-note">${esc(r.catatan||'')}</div></div>`;
+        ${strip}<div class="tk-note">${esc(r.catatan||'')}</div>
+        <div style="padding:8px 14px;border-top:1px solid var(--line)">
+          <button class="btn ghost" style="padding:8px;font-size:12.5px"
+            onclick="cekStock('${esc(r.material_code)}','${esc(r.batch||'')}')">🔍 Cek stock tersedia</button>
+        </div></div>`;
     });
   });
   h+=`<div style="height:8px"></div><button class="btn brand" id="makeTask">Buat Tugas Picking (stock belum dipotong)</button>
@@ -616,22 +639,7 @@ async function doPut(kav,mat,batch,qty){
       `<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
 }
 
-// ---------- stock ----------
-let stTimer;
-document.getElementById('stSearch').addEventListener('input',()=>{clearTimeout(stTimer);stTimer=setTimeout(loadStock,300);});
-async function loadStock(){
-  const q=document.getElementById('stSearch').value.trim();
-  try{
-    const rows=await rpc('wms_stock_list',{p_rdc:RDC,p_search:q,p_limit:100});
-    document.getElementById('stOut').innerHTML = rows.length
-      ? `<div class="card" style="padding:4px 14px">`+rows.map(r=>`
-        <div class="lrow"><div class="g"><div class="t">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
-        <div class="s">${esc(r.location_code)}${r['desc']?' · '+esc(r['desc']):''}</div></div>
-        <div style="text-align:right"><div class="n">${fmt(r.qty)}</div>
-        <span class="pill ${r.status==='DAMAGED'?'p-stop':r.rimpil?'p-warn':'p-ok'}">${r.status==='DAMAGED'?'RUSAK':r.rimpil?'RIMPIL':'BAGUS'}</span></div></div>`).join('')+`</div>`
-      : `<div class="card muted">Belum ada stock${q?' untuk pencarian ini':''}.</div>`;
-  }catch(e){ document.getElementById('stOut').innerHTML=`<div class="card muted">Gagal memuat: ${esc(e.message)}</div>`; }
-}
+// ---------- stock: lihat bagian STOCK BARU di bawah ----------
 
 // ---------- lokasi ----------
 async function loadLoc(){
@@ -1365,5 +1373,175 @@ async function syDecide(id,ok){
 }
 const _go6=go;
 go=function(s){ _go6(s); if(s==='sync') loadSync(); };
+
+// ================= STOCK (filter terpisah + paging + hapus trial) =================
+let ST_PAGE=0, ST_LIMIT=100, ST_TOTAL=0, ST_ROWS=[];
+function stFilters(){
+  return {p_rdc:RDC,
+    p_motif:document.getElementById('fMotif').value.trim(),
+    p_seri:document.getElementById('fSeri').value.trim(),
+    p_gudang:document.getElementById('fGudang').value.trim(),
+    p_block:document.getElementById('fBlock').value.trim(),
+    p_kavling:document.getElementById('fKav').value.trim(),
+    p_status:document.getElementById('fStatus').value,
+    p_limit:ST_LIMIT, p_offset:ST_PAGE*ST_LIMIT};
+}
+document.getElementById('stGo').addEventListener('click',()=>{ST_PAGE=0;loadStock();});
+document.getElementById('stClear').addEventListener('click',()=>{
+  ['fMotif','fSeri','fGudang','fBlock','fKav'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('fStatus').value=''; ST_PAGE=0; loadStock();
+});
+async function loadStock(){
+  const out=document.getElementById('stOut');
+  if(!out) return;
+  out.innerHTML='<div class="card muted">⏳ Memuat…</div>';
+  try{
+    const d=await rpc('wms_stock_search', stFilters());
+    ST_TOTAL=d.total; ST_ROWS=d.rows||[];
+    document.getElementById('stSummary').innerHTML=
+      `Menampilkan <b>${fmt(Math.min(ST_PAGE*ST_LIMIT+1,ST_TOTAL))}–${fmt(Math.min((ST_PAGE+1)*ST_LIMIT,ST_TOTAL))}</b> dari <b>${fmt(ST_TOTAL)}</b> baris · total <b>${fmt(d.total_qty)}</b> box`;
+    out.innerHTML = ST_ROWS.length
+      ? `<div class="card" style="padding:4px 14px">`+ST_ROWS.map(r=>`
+        <div class="lrow">
+          ${ROLE==='master'?`<input type="checkbox" class="stChk" value="${r.id}" style="width:18px;height:18px;flex:0 0 auto">`:''}
+          <div class="g"><div class="t">${esc(r.motif||r.material_code)}</div>
+          <div class="s">${esc(r.material_code)}${r.batch?' · Seri '+esc(r.batch):''}</div>
+          <div class="s">${r.gudang?esc(r.gudang)+' · '+esc(r.block)+' · '+esc(r.kavling):esc(r.location_code)}</div></div>
+          <div style="text-align:right"><div class="n">${fmt(r.qty)}</div>
+          <span class="pill ${r.status==='DAMAGED'?'p-stop':r.rimpil?'p-warn':'p-ok'}">${r.status==='DAMAGED'?'RUSAK':r.rimpil?'RIMPIL':'BAGUS'}</span></div>
+        </div>`).join('')+`</div>`
+      : `<div class="card muted">Tidak ada stock yang cocok dengan pencarian ini.</div>`;
+    const pages=Math.ceil(ST_TOTAL/ST_LIMIT);
+    document.getElementById('stPager').innerHTML = pages>1
+      ? `<button class="btn ghost" ${ST_PAGE<=0?'disabled':''} onclick="stPage(-1)">← Sebelumnya</button>
+         <button class="btn ghost" ${ST_PAGE>=pages-1?'disabled':''} onclick="stPage(1)">Berikutnya →</button>` : '';
+    renderStAdmin();
+  }catch(e){ out.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+function stPage(d){ ST_PAGE+=d; loadStock(); window.scrollTo({top:0}); }
+function renderStAdmin(){
+  const el=document.getElementById('stAdmin');
+  if(ROLE!=='master'){ el.innerHTML=''; return; }
+  el.innerHTML=`<div class="card" style="border-color:#EFC4C0">
+    <div style="font-weight:650;font-size:13.5px;color:var(--stop);margin-bottom:6px">Hapus stock (khusus masa trial)</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Centang baris di atas lalu hapus, atau hapus seluruh stock RDC ini. Semua penghapusan tercatat di riwayat.</div>
+    <button class="btn" style="background:var(--stop);margin-bottom:8px" onclick="stDelete(false)">Hapus yang dicentang</button>
+    <button class="btn ghost" onclick="stDelete(true)">Hapus SEMUA stock ${esc(RDC)}</button>
+    <div id="stDelMsg" style="font-size:13px;margin-top:8px"></div></div>`;
+}
+async function stDelete(all){
+  const msg=document.getElementById('stDelMsg');
+  let ids=[];
+  if(!all){
+    document.querySelectorAll('.stChk:checked').forEach(c=>ids.push(c.value));
+    if(!ids.length){msg.style.color='var(--stop)';msg.textContent='Belum ada baris yang dicentang.';return;}
+  }
+  const konf = all ? `HAPUS SELURUH stock ${RDC}?\n\nIni menghapus ${fmt(ST_TOTAL)} baris. Tindakan ini untuk masa trial saja.`
+                   : `Hapus ${ids.length} baris terpilih?`;
+  if(!confirm(konf)) return;
+  msg.style.color='var(--muted)'; msg.textContent='Menghapus…';
+  try{
+    const r=await rpc('wms_stock_delete',{p_rdc:RDC,p_ids:all?null:ids,p_all:all,p_alasan:'Pembersihan trial'});
+    msg.style.color='var(--ok)'; msg.textContent=`✓ ${fmt(r.dihapus)} baris (${fmt(r.box)} box) dihapus.`;
+    ST_PAGE=0; loadStock(); loadHome(); loadLoc();
+  }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
+}
+
+// ================= PERBAIKAN UMUM =================
+// 1) Huruf KAPITAL otomatis untuk kolom kode (bukan untuk keterangan bebas)
+const CAPS_IDS=['puMat','puBatch','tfMat','tfBatch','dmMat','dmBatch','nlWh','nlBlock','nlLine','nlKav',
+                'fMotif','fSeri','fGudang','fBlock','fKav'];
+CAPS_IDS.forEach(id=>{
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.style.textTransform='uppercase';
+  el.addEventListener('input',()=>{
+    const p=el.selectionStart; el.value=el.value.toUpperCase();
+    try{el.setSelectionRange(p,p);}catch(e){}
+  });
+});
+
+// 2) Sesi kedaluwarsa: token Supabase berlaku 1 jam. Kalau habis, minta login ulang
+//    dengan pesan jelas — bukan error teknis yang membingungkan.
+const _rpc=rpc;
+rpc=async function(fn,params){
+  try{ return await _rpc(fn,params); }
+  catch(e){
+    const m=String(e.message||'');
+    if(m.includes('JWT')||m.includes('expired')||m.includes('401')||m.includes('PGRST301')){
+      sessionExpired(); throw new Error('Sesi berakhir. Silakan masuk lagi.');
+    }
+    throw e;
+  }
+};
+function sessionExpired(){
+  TOKEN=null;
+  document.getElementById('appView').style.display='none';
+  const lv=document.getElementById('loginView');
+  lv.style.display='grid';
+  const msg=document.getElementById('loginMsg');
+  msg.style.color='var(--warn)';
+  msg.textContent='Sesi Anda berakhir karena tidak dipakai cukup lama. Silakan masuk lagi.';
+  document.getElementById('pw').value='';
+}
+
+// 3) Tombol kembali di setiap layar selain Hari Ini
+const HOME_OF={pick:'home',put:'home',stock:'home',opname:'home',more:'home',
+  loc:'more',rusak:'more',arsip:'more',sap:'more',unloc:'more',recon:'more',
+  import:'more',tasks:'more',task:'tasks',transfer:'more',sync:'more'};
+function ensureBackButtons(){
+  Object.keys(HOME_OF).forEach(s=>{
+    const sec=document.getElementById('s-'+s); if(!sec) return;
+    const wrap=sec.querySelector('.wrap'); if(!wrap||wrap.querySelector('.backbtn')) return;
+    const b=document.createElement('div');
+    b.className='backbtn';
+    b.style.cssText='display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;padding:6px 0 2px;font-weight:600';
+    b.innerHTML='← Kembali';
+    b.onclick=()=>go(HOME_OF[s]);
+    wrap.insertBefore(b, wrap.firstChild);
+  });
+}
+ensureBackButtons();
+
+// ================= CEK STOCK CEPAT SAAT PICKING =================
+// Tim lapangan sering perlu tahu "barang ini ada di mana lagi / sisa berapa"
+// tanpa keluar dari layar picking.
+async function cekStock(mat, batch){
+  const box=document.getElementById('pickCek');
+  box.style.display='block';
+  box.innerHTML='<div class="card muted">⏳ Mencari…</div>';
+  try{
+    const locs=await rpc('wms_stock_locations',{p_rdc:RDC,p_material:mat,p_batch:batch||null});
+    const tot=locs.reduce((s,l)=>s+Number(l.qty||0),0);
+    let all=[];
+    if(!batch){ all=locs; }
+    else{
+      const other=await rpc('wms_stock_locations',{p_rdc:RDC,p_material:mat,p_batch:null});
+      all=other;
+    }
+    const bySeri={};
+    all.forEach(l=>{ (bySeri[l.batch||'-']=bySeri[l.batch||'-']||[]).push(l); });
+    box.innerHTML=`<div class="card">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="flex:1;font-weight:650;font-size:13.5px">${esc(mat)}${batch?' · Seri '+esc(batch):''}</div>
+        <button class="btn ghost" style="width:auto;padding:6px 12px;font-size:12px" onclick="document.getElementById('pickCek').style.display='none'">Tutup</button>
+      </div>
+      ${batch?`<div class="muted" style="font-size:12.5px;margin-bottom:8px">Seri ${esc(batch)}: <b>${fmt(tot)}</b> box tersedia</div>`:''}
+      ${Object.keys(bySeri).length?Object.keys(bySeri).map(s=>{
+        const rows=bySeri[s]; const t=rows.reduce((a,l)=>a+Number(l.qty||0),0);
+        return `<div style="margin-bottom:10px">
+          <div style="font-family:var(--mono);font-size:12px;font-weight:700;color:var(--navy,#14161A);margin-bottom:4px">
+            SERI ${esc(s)} — ${fmt(t)} box</div>
+          ${rows.map(l=>`<div class="lrow" style="padding:7px 0">
+            <div class="g"><div class="t">${esc(l.gudang)} · ${esc(l.block)} · ${esc(l.kavling)}</div>
+            <div class="s">${esc(l.location_code)}</div></div>
+            <div style="text-align:right"><div class="n">${fmt(l.qty)}</div>
+            ${l.rimpil?'<span class="pill p-warn" style="font-size:9px">RIMPIL</span>':''}</div></div>`).join('')}
+        </div>`;}).join('')
+       :'<div class="muted" style="font-size:12.5px">Tidak ada stock untuk material ini.</div>'}
+    </div>`;
+    box.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }catch(e){ box.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
 
 </script></body></html>
