@@ -201,7 +201,17 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div class="eyebrow">Picking dari RK Final</div>
   <div class="hint">Upload RK Final → sistem cek ke stock asli → tandai yang salah sebelum barang naik mobil.</div>
   <input type="file" id="rkFile" accept=".ods,.xlsx,.xls" style="display:none">
-  <button class="btn ghost" onclick="document.getElementById('rkFile').click()">📄 Pilih file RK Final…</button>
+  <div class="card" style="margin-bottom:10px">
+    <label>Jenis pengeluaran</label>
+    <select id="pickJenis" style="margin-bottom:10px">
+      <option value="RK">RK (Rekap Kirim)</option>
+      <option value="Amsen">Amsen (Ambil Sendiri)</option>
+      <option value="Tukar Barang">Tukar Barang Customer</option>
+      <option value="Retur Pabrik">Dikembalikan ke Pabrik</option>
+      <option value="Others">Others</option>
+    </select>
+    <button class="btn ghost" onclick="document.getElementById('rkFile').click()">📄 Pilih file…</button>
+  </div>
   <div id="pickCek" style="display:none;margin-top:12px"></div>
   <div id="pickOut" style="margin-top:14px"></div>
 </div></section>
@@ -368,6 +378,11 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
       <div><label>Material</label><input id="tfMat" placeholder="AGT602501R"></div>
       <div style="max-width:120px"><label>Seri (opsional)</label><input id="tfBatch" placeholder="S12S"></div>
     </div>
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Gudang</label><input id="tfGud" placeholder="semua"></div>
+      <div><label>Block</label><input id="tfBlk" placeholder="semua"></div>
+      <div><label>Kavling</label><input id="tfKav" placeholder="semua"></div>
+    </div>
     <button class="btn" id="tfFind">Cari lokasi barang</button>
     <div id="tfMsg" style="font-size:13px;margin-top:8px"></div>
   </div>
@@ -414,7 +429,8 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div class="card">
     <div class="row" style="margin-bottom:10px">
       <div><label>Kode motif / awalan</label><input id="pmKode" placeholder="AGT602"></div>
-      <div style="max-width:130px"><label>Box per pallet</label><input id="pmBox" inputmode="numeric" placeholder="40"></div>
+      <div style="max-width:110px"><label>Box/pallet</label><input id="pmBox" inputmode="numeric" placeholder="40"></div>
+      <div style="max-width:110px"><label>Ukuran</label><input id="pmSize" placeholder="60x60"></div>
     </div>
     <div style="margin-bottom:12px"><label>Keterangan (opsional)</label><input id="pmKet" placeholder="mis. Granit 60x60"></div>
     <button class="btn" id="pmSave">Simpan</button>
@@ -423,10 +439,48 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div id="pmOut"></div>
 </div></section>
 
+
+<section class="screen" id="s-kap"><div class="wrap">
+  <div class="eyebrow">Master kapasitas per ukuran</div>
+  <div class="hint">Dari luas gudang → berapa persen dipakai untuk barang → tetapkan max box per ukuran keramik. Occupancy dihitung dari sini.</div>
+  <div class="card">
+    <div style="margin-bottom:10px"><label>Gudang</label><select id="kpWh"></select></div>
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Ukuran</label><input id="kpSize" placeholder="60x60"></div>
+      <div><label>Max box</label><input id="kpMax" inputmode="numeric" placeholder="3000"></div>
+      <div style="max-width:100px"><label>% luas</label><input id="kpPct" inputmode="numeric" placeholder="100"></div>
+    </div>
+    <button class="btn" id="kpSave">Simpan kapasitas</button>
+    <div id="kpMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div id="kpOut"></div>
+</div></section>
+
+<section class="screen" id="s-occ"><div class="wrap">
+  <div class="eyebrow">Occupancy</div>
+  <div class="hint">Rata-rata bisa menyembunyikan overload — rincian per ukuran selalu ditampilkan.</div>
+  <div id="occOut"></div>
+</div></section>
+
+
+<section class="screen" id="s-oparsip"><div class="wrap">
+  <div class="eyebrow">Arsip opname</div>
+  <div class="hint">Riwayat seluruh hitungan opname beserta keputusan Spv &amp; Manager.</div>
+  <div class="row" style="margin-bottom:10px">
+    <div style="display:flex;align-items:flex-end"><button class="btn" id="opArLoad" style="padding:12px">Muat</button></div>
+    <div style="display:flex;align-items:flex-end"><button class="btn ghost" id="opArXls" style="padding:12px">⬇ Excel</button></div>
+    <div style="display:flex;align-items:flex-end"><button class="btn ghost" id="opArPdf" style="padding:12px">🖨 PDF</button></div>
+  </div>
+  <div id="opArOut"></div>
+</div></section>
+
 <section class="screen" id="s-more"><div class="wrap">
   <div class="eyebrow">Menu lainnya</div>
   <div class="card" style="padding:4px 14px">
     <div class="lrow" style="cursor:pointer" onclick="go('sap')"><div class="g"><div class="t">Upload Stock SAP</div><div class="s">Sumber semua stock awal</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('oparsip')"><div class="g"><div class="t">Arsip Opname</div><div class="s">Riwayat + Excel/PDF</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('occ')"><div class="g"><div class="t">Occupancy</div><div class="s">Per ukuran &amp; per gudang</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('kap')"><div class="g"><div class="t">Master Kapasitas</div><div class="s">Max box per ukuran</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('mmotif')"><div class="g"><div class="t">Master Kode Motif</div><div class="s">Motif ditaruh di block mana</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('mpallet')"><div class="g"><div class="t">Master Isi Pallet</div><div class="s">Box per pallet</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('sync')"><div class="g"><div class="t">Selaraskan dengan SAP</div><div class="s">Perlu persetujuan RDC Manager</div></div><div class="n muted">›</div></div>
@@ -615,7 +669,7 @@ function renderPick(rows,fname){
   if(b) b.onclick=async()=>{
     b.disabled=true;b.textContent='\u23f3 Membuat tugas\u2026';
     try{
-      const res=await rpc('wms_pick_task_create',{p_rdc:RDC,p_filename:fname,p_lines:PICK_LINES});
+      const res=await rpc('wms_pick_task_create',{p_rdc:RDC,p_filename:fname,p_lines:PICK_LINES,p_jenis:pickJenis()});
       openTask(res.task_id);
     }catch(e){ b.disabled=false;b.textContent='Coba lagi';
       document.getElementById('pickOut').insertAdjacentHTML('afterbegin',
@@ -660,7 +714,9 @@ document.getElementById('puFind').addEventListener('click',async()=>{
         <div class="tk-strip"><div class="bar ${pct>=90?'full':pct>=70?'high':''}"><i style="width:${pct}%"></i></div>
         <div class="muted" style="font-size:12px;margin-top:7px">${esc(r.reason)}</div>
         <button class="btn brand" style="margin-top:10px" onclick="doPut(${r.kavling_id},'${esc(mat)}','${esc(batch)}',${r.qty_to_place})">
-          Simpan ke ${esc(r.location_code)}</button></div></div>`;
+          Simpan ke ${esc(r.location_code)}</button>
+        <button class="btn ghost" style="margin-top:8px" onclick="puManual('${esc(mat)}','${esc(batch)}',${r.qty_to_place})">
+          Pilih kavling lain…</button></div></div>`;
     });
     document.getElementById('puOut').innerHTML=h;
   }catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}
@@ -769,14 +825,16 @@ async function loadOpPending(){
     el.innerHTML=`<div class="eyebrow">Menunggu persetujuan</div>`+rows.map(r=>{
       const neg=Number(r.selisih)<0;
       return `<div class="ticket ${neg?'stop':'warn'}">
-        <div class="tk-top"><div class="m"><div class="tk-mat">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
-        <div class="tk-desc">${esc(r.location_code)} · ${esc(r.counted_by||'')} · ${esc(r.waktu||'')}</div></div>
+        <div class="tk-top"><div class="m"><div class="tk-mat">${esc(r.motif||r.material_code)}</div>
+        <div class="tk-desc">${esc(r.material_code)}${r.batch?' · Seri '+esc(r.batch):''}</div>
+        <div class="tk-desc">${r.gudang?esc(r.gudang)+' · '+esc(r.block)+' · '+esc(r.kavling):esc(r.location_code)} · ${esc(r.counted_by||'')} · ${esc(r.waktu||'')}</div></div>
         <div class="tk-qty"><b>${Number(r.selisih)>0?'+':''}${fmt(r.selisih)}</b><span>SELISIH</span></div></div>
         <div class="tk-strip"><div class="muted" style="font-size:12.5px">Sistem ${fmt(r.qty_system)} · Fisik ${fmt(r.qty_physical)}</div>
-        ${ROLE==='master'?`<div class="row" style="margin-top:10px">
-          <button class="btn" style="padding:10px" onclick="opDecide(${r.id},true)">Setujui</button>
+        <div class="muted" style="font-size:12px;margin-top:6px">Tahap: <b>${esc(r.tahap||'')}</b>${r.spv_by?' · Spv: '+esc(r.spv_by):''}</div>
+        ${((ROLE==='master'&&r.spv_status)||(ROLE!=='master'&&!r.spv_status))?`<div class="row" style="margin-top:10px">
+          <button class="btn" style="padding:10px" onclick="opDecide(${r.id},true)">${ROLE==='master'?'Setujui (Manager)':'Setujui (Spv)'}</button>
           <button class="btn ghost" style="padding:10px" onclick="opDecide(${r.id},false)">Tolak</button></div>`
-          :`<div class="muted" style="margin-top:8px;font-size:12.5px">Menunggu RDC Manager.</div>`}
+          :`<div class="muted" style="margin-top:8px;font-size:12.5px">${r.spv_status?'Menunggu persetujuan Manager.':'Menunggu persetujuan Spv.'}</div>`}
         </div></div>`;}).join('');
   }catch(e){ el.innerHTML=''; }
 }
@@ -1304,7 +1362,7 @@ document.getElementById('tfFind').addEventListener('click',async()=>{
   if(!mat){msg.style.color='var(--stop)';msg.textContent='Kode material wajib diisi.';return;}
   msg.style.color='var(--muted)'; msg.textContent='Mencari…';
   try{
-    TF_LOCS=await rpc('wms_stock_locations',{p_rdc:RDC,p_material:mat,p_batch:batch||null});
+    TF_LOCS=tfLocFilter(await rpc('wms_stock_locations',{p_rdc:RDC,p_material:mat,p_batch:batch||null}));
     msg.textContent='';
     if(!TF_LOCS.length){
       document.getElementById('tfOut').innerHTML='<div class="card muted">Barang ini tidak ada di kavling manapun.</div>';
@@ -1631,7 +1689,7 @@ async function loadPallet(){
     document.getElementById('pmOut').innerHTML = rows.length
       ? '<div class="eyebrow">Tersimpan</div><div class="card" style="padding:4px 14px">'+rows.map(r=>`
         <div class="lrow"><div class="g"><div class="t">${esc(r.kode_motif)}</div>
-        <div class="s">${r.keterangan?esc(r.keterangan):'—'}</div></div>
+        <div class="s">${r.ukuran?'Ukuran '+esc(r.ukuran):'ukuran belum diisi'}${r.keterangan?' · '+esc(r.keterangan):''}</div></div>
         <div style="text-align:right"><div class="n">${fmt(r.box_per_pallet)}</div>
         <div class="s" style="font-size:10px">box/pallet</div></div></div>`).join('')+'</div>'
       : '<div class="card muted">Belum ada data. Tambahkan di atas.</div>';
@@ -1645,7 +1703,8 @@ document.getElementById('pmSave').addEventListener('click',async()=>{
   msg.style.color='var(--muted)'; msg.textContent='Menyimpan…';
   try{
     await rpc('wms_pallet_save',{p_rdc:RDC,p_kode:kode,p_box:box,
-      p_keterangan:document.getElementById('pmKet').value.trim()||null});
+      p_keterangan:document.getElementById('pmKet').value.trim()||null,
+      p_ukuran:document.getElementById('pmSize').value.trim()||null});
     msg.style.color='var(--ok)'; msg.textContent='✓ Tersimpan.';
     document.getElementById('pmKode').value=''; document.getElementById('pmBox').value='';
     document.getElementById('pmKet').value=''; loadPallet();
@@ -1720,5 +1779,192 @@ function parseMasterMotif(wb){
   }
   return [];
 }
+
+// ================= MASTER KAPASITAS PER UKURAN =================
+async function loadKapasitas(){
+  try{
+    const [rows,whs]=await Promise.all([
+      rpc('wms_size_capacity_list',{p_rdc:RDC}),
+      rpc('wms_block_options',{p_rdc:RDC})]);
+    const seen={}; const opts=[];
+    whs.forEach(b=>{ if(!seen[b.gudang]){seen[b.gudang]=1; opts.push(b);} });
+    document.getElementById('kpWh').innerHTML=opts.map(o=>
+      `<option value="${o.block_id}" data-g="${esc(o.gudang)}">Gudang ${esc(o.gudang)}</option>`).join('');
+    // we need warehouse_id, derive from a dedicated call
+    const whList=await rpc('wms_warehouse_options',{p_rdc:RDC}).catch(()=>null);
+    if(whList) document.getElementById('kpWh').innerHTML=whList.map(w=>
+      `<option value="${w.warehouse_id}">Gudang ${esc(w.gudang)}</option>`).join('');
+    document.getElementById('kpOut').innerHTML = rows.length
+      ? '<div class="eyebrow">Tersimpan</div><div class="card" style="padding:4px 14px">'+rows.map(r=>`
+        <div class="lrow"><div class="g"><div class="t">Gudang ${esc(r.gudang)} · ${esc(r.ukuran)}</div>
+        <div class="s">${r.luas_persen?r.luas_persen+'% luas':''}${r.catatan?' · '+esc(r.catatan):''}</div></div>
+        <div style="text-align:right"><div class="n">${fmt(r.max_box)}</div>
+        <div class="s" style="font-size:10px">max box</div></div></div>`).join('')+'</div>'
+      : '<div class="card muted">Belum ada kapasitas. Tambahkan di atas.</div>';
+  }catch(e){ document.getElementById('kpOut').innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+document.getElementById('kpSave').addEventListener('click',async()=>{
+  const msg=document.getElementById('kpMsg');
+  const wh=parseInt(document.getElementById('kpWh').value);
+  const size=document.getElementById('kpSize').value.trim();
+  const max=parseFloat(document.getElementById('kpMax').value);
+  const pct=parseFloat(document.getElementById('kpPct').value);
+  if(!wh||!size||!isFinite(max)||max<=0){msg.style.color='var(--stop)';msg.textContent='Gudang, ukuran, dan max box wajib diisi.';return;}
+  msg.style.color='var(--muted)'; msg.textContent='Menyimpan…';
+  try{
+    await rpc('wms_size_capacity_save',{p_rdc:RDC,p_warehouse_id:wh,p_ukuran:size,
+      p_max_box:max,p_luas_persen:isFinite(pct)?pct:null,p_catatan:null});
+    msg.style.color='var(--ok)'; msg.textContent='✓ Tersimpan.';
+    document.getElementById('kpSize').value=''; document.getElementById('kpMax').value='';
+    loadKapasitas();
+  }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
+});
+
+// ================= OCCUPANCY =================
+async function loadOccupancy(){
+  const el=document.getElementById('occOut');
+  el.innerHTML='<div class="card muted">⏳ Menghitung…</div>';
+  try{
+    const d=await rpc('wms_occupancy',{p_rdc:RDC});
+    const pill=s=>s==='OVERLOAD'?'p-stop':s==='HAMPIR PENUH'?'p-warn':s==='BELUM DIATUR'?'p-warn':'p-ok';
+    let h=`<div class="kpi" style="margin-bottom:12px">
+      <div class="lbl">Occupancy ${esc(d.rdc)}</div>
+      <div class="val">${d.persen!=null?d.persen:'—'}<small>%</small></div>
+      <div class="muted" style="font-size:12px;margin-top:4px">${fmt(d.total_isi)} / ${fmt(d.total_max)} box</div></div>`;
+    if(Number(d.box_belum_diatur)>0){
+      h+=`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg);margin-bottom:12px">
+        <div style="font-weight:650;color:var(--warn);font-size:13.5px">${fmt(d.box_belum_diatur)} box belum masuk hitungan</div>
+        <div class="muted" style="font-size:12px;margin-top:4px">Ukurannya belum diatur di Master Isi Pallet, atau kapasitasnya belum ditetapkan. Angka di atas belum mencakup ini.</div></div>`;
+    }
+    h+='<div class="eyebrow">Per gudang</div><div class="card" style="padding:4px 14px">'+
+      (d.per_gudang||[]).map(g=>`<div class="lrow"><div class="g">
+        <div class="t">Gudang ${esc(g.gudang)}</div>
+        <div class="s">${fmt(g.isi)} / ${fmt(g.max_box)} box${Number(g.box_belum_diatur)>0?' · '+fmt(g.box_belum_diatur)+' belum diatur':''}</div></div>
+        <div style="text-align:right"><div class="n">${g.persen!=null?g.persen+'%':'—'}</div>
+        ${g.ada_overload?'<span class="pill p-stop" style="font-size:9px">ADA OVERLOAD</span>':''}</div></div>`).join('')+'</div>';
+    h+='<div class="eyebrow">Rincian per ukuran</div><div class="card" style="padding:4px 14px">'+
+      (d.detail||[]).map(x=>`<div class="lrow"><div class="g">
+        <div class="t">${esc(x.gudang)} · ${esc(x.ukuran)}</div>
+        <div class="s">${fmt(x.isi)}${x.max_box?' / '+fmt(x.max_box):''} box</div></div>
+        <div style="text-align:right"><div class="n" ${x.status==='OVERLOAD'?'style="color:var(--stop)"':''}>${x.persen!=null?x.persen+'%':'—'}</div>
+        <span class="pill ${pill(x.status)}" style="font-size:9px">${esc(x.status)}</span></div></div>`).join('')+'</div>';
+    el.innerHTML=h;
+  }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+['kpSize','pmSize'].forEach(id=>{const el=document.getElementById(id);
+  if(el){el.style.textTransform='uppercase';
+    el.addEventListener('input',()=>{const p=el.selectionStart;el.value=el.value.toUpperCase();try{el.setSelectionRange(p,p);}catch(e){}});}});
+const _go8=go;
+go=function(s){ _go8(s); if(s==='kap') loadKapasitas(); if(s==='occ') loadOccupancy(); };
+
+// ================= (6) JENIS PENGELUARAN PADA PICKING =================
+// pick task now carries jenis: RK / Amsen / Tukar Barang / Retur Pabrik / Others
+const _mkTaskOrig = null;
+function pickJenis(){ const e=document.getElementById('pickJenis'); return e?e.value:'RK'; }
+
+// ================= (11) FILTER PADA PINDAH LOKASI =================
+function tfLocFilter(list){
+  const g=(document.getElementById('tfGud').value||'').trim().toUpperCase();
+  const b=(document.getElementById('tfBlk').value||'').trim().toUpperCase();
+  const k=(document.getElementById('tfKav').value||'').trim().toUpperCase();
+  return list.filter(l=>
+    (!g||String(l.gudang||'').toUpperCase().includes(g)) &&
+    (!b||String(l.block||'').toUpperCase().includes(b)) &&
+    (!k||String(l.kavling||'').toUpperCase().includes(k)));
+}
+
+// ================= (15/16) ARSIP OPNAME =================
+let OP_HIST=[];
+document.getElementById('opArLoad').addEventListener('click',loadOpArsip);
+async function loadOpArsip(){
+  const el=document.getElementById('opArOut');
+  el.innerHTML='<div class="card muted">⏳ Memuat…</div>';
+  try{
+    OP_HIST=await rpc('wms_opname_history',{p_rdc:RDC,p_limit:300});
+    if(!OP_HIST.length){ el.innerHTML='<div class="card muted">Belum ada data opname.</div>'; return; }
+    const pill=s=>s==='DISETUJUI'?'p-ok':s==='DITOLAK'?'p-stop':'p-warn';
+    el.innerHTML=`<div class="muted" style="font-size:12.5px;margin-bottom:8px">${fmt(OP_HIST.length)} catatan</div>
+      <div class="card" style="padding:4px 14px">`+OP_HIST.map(o=>`
+      <div class="lrow"><div class="g">
+        <div class="t">${esc(o.motif||o.material_code)}</div>
+        <div class="s">${esc(o.gudang)} · ${esc(o.block)} · ${esc(o.kavling)}${o.batch?' · Seri '+esc(o.batch):''}</div>
+        <div class="s">Sistem ${fmt(o.qty_system)} · Fisik ${fmt(o.qty_physical)} · ${esc(o.tanggal)}</div>
+        <div class="s">Hitung: ${esc(o.counted_by||'-')}${o.spv_by?' · Spv: '+esc(o.spv_by):''}${o.approved_by?' · Mgr: '+esc(o.approved_by):''}</div>
+      </div>
+      <div style="text-align:right"><div class="n" style="color:${Number(o.selisih)<0?'var(--stop)':Number(o.selisih)>0?'var(--warn)':'inherit'}">${Number(o.selisih)>0?'+':''}${fmt(o.selisih)}</div>
+      <span class="pill ${pill(o.status)}" style="font-size:9px">${esc(o.status)}</span></div></div>`).join('')+`</div>`;
+  }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+document.getElementById('opArXls').addEventListener('click',()=>{
+  if(!OP_HIST.length){alert('Muat data dulu.');return;}
+  const aoa=[['Tanggal','Gudang','Block','Kavling','Motif','Kode Material','Seri',
+              'Qty Sistem','Qty Fisik','Selisih','Status','Dihitung','Spv','Manager','Disetujui']];
+  OP_HIST.forEach(o=>aoa.push([o.tanggal,o.gudang,o.block,o.kavling,o.motif,o.material_code,o.batch,
+    o.qty_system,o.qty_physical,o.selisih,o.status,o.counted_by,o.spv_by,o.approved_by,o.approved_at]));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),'Arsip Opname');
+  XLSX.writeFile(wb,'Opname_'+RDC+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+});
+document.getElementById('opArPdf').addEventListener('click',()=>{
+  if(!OP_HIST.length){alert('Muat data dulu.');return;}
+  const rows=OP_HIST.map(o=>`<tr>
+    <td>${esc(o.tanggal)}</td><td>${esc(o.gudang)}·${esc(o.block)}·${esc(o.kavling)}</td>
+    <td>${esc(o.motif||o.material_code)}<br><small>${esc(o.material_code)}</small></td>
+    <td>${esc(o.batch||'-')}</td><td class="r">${fmt(o.qty_system)}</td><td class="r">${fmt(o.qty_physical)}</td>
+    <td class="r"><b>${Number(o.selisih)>0?'+':''}${fmt(o.selisih)}</b></td>
+    <td>${esc(o.status)}</td><td><small>${esc(o.counted_by||'-')}<br>Spv: ${esc(o.spv_by||'-')}<br>Mgr: ${esc(o.approved_by||'-')}</small></td></tr>`).join('');
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Arsip Opname ${esc(RDC)}</title><style>
+    body{font-family:Arial,sans-serif;font-size:11px;padding:18px;color:#14161A}
+    h2{margin:0 0 2px} .sub{color:#666;font-size:11px;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse} th,td{border:1px solid #ccc;padding:5px;vertical-align:top}
+    th{background:#14161A;color:#fff;text-align:left;font-size:10px}
+    .r{text-align:right} small{color:#666}
+    @media print{@page{size:landscape;margin:10mm}}
+  </style></head><body>
+    <h2>Arsip Stock Opname — RDC ${esc(RDC)}</h2>
+    <div class="sub">Dicetak ${new Date().toLocaleString('id-ID')} · ${OP_HIST.length} catatan</div>
+    <table><thead><tr><th>Tanggal</th><th>Lokasi</th><th>Motif</th><th>Seri</th>
+      <th>Sistem</th><th>Fisik</th><th>Selisih</th><th>Status</th><th>Petugas</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    <p style="margin-top:24px;font-size:11px">
+      Dihitung oleh: ________________ &nbsp;&nbsp; Spv: ________________ &nbsp;&nbsp; Manager: ________________</p>
+  </body></html>`);
+  w.document.close(); setTimeout(()=>w.print(),400);
+});
+const _go9=go;
+go=function(s){ _go9(s); if(s==='oparsip') loadOpArsip(); };
+
+// ================= (8) PUTAWAY: PILIH KAVLING MANUAL =================
+async function puManual(mat,batch,qty){
+  const out=document.getElementById('puOut');
+  out.insertAdjacentHTML('afterbegin','<div class="card muted" id="puManLoad">⏳ Memuat daftar kavling…</div>');
+  try{
+    const targets=await rpc('wms_transfer_targets',{p_rdc:RDC,p_exclude:null});
+    document.getElementById('puManLoad')?.remove();
+    const opts=targets.map(t=>{
+      const sisa=t.kapasitas?(t.kapasitas-t.terisi):null;
+      return `<option value="${t.kavling_id}">${esc(t.location_code)}${sisa!=null?' — sisa '+fmt(sisa):''}</option>`;}).join('');
+    out.insertAdjacentHTML('afterbegin',`<div class="card" id="puManBox" style="border-color:var(--brand)">
+      <div style="font-weight:650;font-size:13.5px;margin-bottom:8px">Pilih kavling sendiri</div>
+      <label>Kavling</label><select id="puManKav" style="margin-bottom:10px">${opts}</select>
+      <label>Qty</label><input id="puManQty" inputmode="numeric" value="${qty}" style="margin-bottom:12px">
+      <button class="btn brand" onclick="puManualSave('${esc(mat)}','${esc(batch)}')">Simpan ke kavling ini</button>
+      <button class="btn ghost" style="margin-top:8px" onclick="document.getElementById('puManBox').remove()">Batal</button>
+      <div id="puManMsg" style="font-size:13px;margin-top:8px"></div></div>`);
+  }catch(e){ document.getElementById('puManLoad')?.remove(); alert('Gagal: '+e.message); }
+}
+async function puManualSave(mat,batch){
+  const kav=parseInt(document.getElementById('puManKav').value);
+  const qty=parseFloat(document.getElementById('puManQty').value);
+  const msg=document.getElementById('puManMsg');
+  if(!kav||!isFinite(qty)||qty<=0){msg.style.color='var(--stop)';msg.textContent='Kavling dan qty wajib diisi.';return;}
+  msg.style.color='var(--muted)'; msg.textContent='Menyimpan…';
+  try{ await doPut(kav,mat,batch,qty); }
+  catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
+}
+['tfGud','tfBlk','tfKav'].forEach(id=>{const el=document.getElementById(id);
+  if(el){el.style.textTransform='uppercase';
+    el.addEventListener('input',()=>{const p=el.selectionStart;el.value=el.value.toUpperCase();try{el.setSelectionRange(p,p);}catch(e){}});}});
 
 </script></body></html>
