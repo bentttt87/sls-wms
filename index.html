@@ -193,6 +193,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   </div>
   <div class="eyebrow">Kondisi hari ini</div>
   <div class="kpis" id="homeKpis"></div>
+  <div id="homeZoneAlert"></div>
   <div class="eyebrow">Aktivitas terakhir</div>
   <div class="card" style="padding:4px 14px" id="homeRecent"></div>
 </div></section>
@@ -219,6 +220,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 <section class="screen" id="s-put"><div class="wrap">
   <div class="eyebrow">Barang masuk — cari lokasi</div>
   <div class="hint">Sistem memilihkan kavling. Anda tinggal setujui atau ganti.</div>
+  <div id="puSizeGate"></div>
   <div class="card">
     <div class="row" style="margin-bottom:10px">
       <div><label>Material</label><input id="puMat" placeholder="AGT912214R"></div>
@@ -315,7 +317,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 
 <section class="screen" id="s-arsip"><div class="wrap">
   <div class="eyebrow">Arsip bulanan</div>
-  <div class="hint">Unduh transaksi bulan lama ke Excel, lalu hapus dari database agar tidak penuh. Ringkasan bulanan tetap tersimpan.</div>
+  <div class="hint">Unduh transaksi bulan lama ke Excel. Penghapusan hanya dapat dilakukan dengan approval MASTER dan konfirmasi berlapis. Ringkasan bulanan tetap tersimpan.</div>
   <div id="arOut"></div>
 </div></section>
 
@@ -456,6 +458,38 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div id="kpOut"></div>
 </div></section>
 
+<section class="screen" id="s-zone"><div class="wrap">
+  <div class="eyebrow">Zonasi gudang berdasarkan ukuran</div>
+  <div class="hint">Bagi luas tiap gudang berdasarkan kategori ukuran keramik. Total alokasi per gudang maksimal 100%. Material wajib memiliki kategori ukuran sebelum Putaway.</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Gudang</label><select id="znWh"></select></div>
+      <div><label>Kategori ukuran</label><input id="znSize" placeholder="30x30"></div>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <div><label>% luas gudang</label><input id="znPct" inputmode="decimal" placeholder="30"></div>
+      <div><label>Keterangan</label><input id="znNote" placeholder="mis. Keramik 30x30"></div>
+    </div>
+    <div style="margin-bottom:12px"><label>Block yang termasuk zona ini</label><div id="znBlocks" class="card" style="padding:8px;margin:0;background:#FBFAF8"></div></div>
+    <button class="btn" id="znSave">Simpan zona ukuran</button>
+    <div id="znMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div id="znList"></div>
+
+  <div class="eyebrow">Klasifikasi material ke ukuran</div>
+  <div class="hint">Pilih beberapa material sekaligus, lalu tetapkan kategori ukuran. Material baru dari SAP yang belum dikategorikan akan ditandai dan tidak dapat diproses Putaway sampai kategorinya ditentukan.</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Cari material</label><input id="zmSearch" placeholder="kode / motif / deskripsi"></div>
+      <div><label>Set kategori</label><select id="zmSize"></select></div>
+    </div>
+    <button class="btn" id="zmAssign">Tetapkan kategori untuk item terpilih</button>
+    <div id="zmMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div id="zmAlert"></div>
+  <div id="zmList"></div>
+</div></section>
+
 <section class="screen" id="s-occ"><div class="wrap">
   <div class="eyebrow">Occupancy</div>
   <div class="hint">Rata-rata bisa menyembunyikan overload — rincian per ukuran selalu ditampilkan.</div>
@@ -480,6 +514,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
     <div class="lrow" style="cursor:pointer" onclick="go('sap')"><div class="g"><div class="t">Upload Stock SAP</div><div class="s">Sumber semua stock awal</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('oparsip')"><div class="g"><div class="t">Arsip Opname</div><div class="s">Riwayat + Excel/PDF</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('occ')"><div class="g"><div class="t">Occupancy</div><div class="s">Per ukuran &amp; per gudang</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('zone')"><div class="g"><div class="t">Zonasi Ukuran</div><div class="s">% luas gudang + klasifikasi SKU per ukuran</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('kap')"><div class="g"><div class="t">Master Kapasitas</div><div class="s">Max box per ukuran</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('mmotif')"><div class="g"><div class="t">Master Kode Motif</div><div class="s">Motif ditaruh di block mana</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('mpallet')"><div class="g"><div class="t">Master Isi Pallet</div><div class="s">Box per pallet</div></div><div class="n muted">›</div></div>
@@ -537,7 +572,7 @@ async function doLogin(){
     TOKEN=(await r.json()).access_token;
     document.getElementById('loginView').style.display='none';
     document.getElementById('appView').style.display='block';
-    document.getElementById('whoRole').textContent = ROLE==='master'?'RDC Manager':'Head RDC';
+    document.getElementById('whoRole').textContent = ROLE==='master'?'MASTER':'RDC User';
     await setupRdc();
   }catch(e){msg.textContent='Gagal: '+e.message;msg.style.color='var(--stop)';}
 }
@@ -556,7 +591,7 @@ async function setupRdc(){
 }
 
 // ---------- screens ----------
-const SUB={home:'RDC · HARI INI',pick:'RK FINAL · PICKING',put:'BARANG MASUK',stock:'STOCK ON HAND',loc:'MASTER LOKASI'};
+const SUB={home:'RDC · HARI INI',pick:'RK FINAL · PICKING',put:'BARANG MASUK',stock:'STOCK ON HAND',loc:'MASTER LOKASI',zone:'ZONASI UKURAN'};
 function go(s){
   document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('on',e.id==='s-'+s));
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
@@ -572,6 +607,7 @@ async function loadHome(){
     <div class="kpi"><div class="lbl">Kavling Terpakai</div><div class="val">${fmt(d.kavling_used)} <small>/ ${fmt(d.kavling_total)}</small></div></div>
     <div class="kpi"><div class="lbl">Rimpil</div><div class="val">${fmt(d.rimpil_count)} <small>kavling</small></div></div>`;
   const rec=d.recent||[];
+  refreshHomeZoneAlert();
   document.getElementById('homeRecent').innerHTML = rec.length? rec.map(r=>`
     <div class="lrow"><div class="g"><div class="t">${esc(r.txn_type)}${r.txn_subtype?' · '+esc(r.txn_subtype):''}</div>
     <div class="s">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''} · ${esc(r.waktu)} · ${esc(r.created_by||'')}</div></div>
@@ -700,6 +736,13 @@ document.getElementById('puFind').addEventListener('click',async()=>{
   const msg=document.getElementById('puMsg'); msg.textContent='';
   if(!mat||!isFinite(qty)||qty<=0){msg.style.color='var(--stop)';msg.textContent='Material dan qty wajib diisi.';return;}
   try{
+    const sizeCat=getMaterialSizeCategory(mat);
+    const gate=document.getElementById('puSizeGate');
+    if(!sizeCat){
+      gate.innerHTML=`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg)"><div style="font-weight:650;color:var(--warn)">Material ${esc(mat)} belum memiliki kategori ukuran</div><div class="muted" style="font-size:12.5px;margin-top:4px">Tetapkan kategori di menu Zonasi Ukuran sebelum material dapat diarahkan ke lokasi.</div><button class="btn ghost" style="margin-top:9px" onclick="go('zone');setTimeout(()=>{document.getElementById('zmSearch').value='${esc(mat)}';renderZoneMaterials();},100)">Atur kategori ukuran</button></div>`;
+      msg.style.color='var(--warn)'; msg.textContent='Putaway ditahan: kategori ukuran belum ditentukan.'; return;
+    }
+    gate.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg);padding:10px 14px"><span class="pill p-ok">UKURAN ${esc(sizeCat)}</span> <span class="muted" style="font-size:12px">Rekomendasi lokasi akan mengikuti zonasi ukuran yang tersedia.</span></div>`;
     const res=await rpc('wms_suggest_putaway',{p_rdc:RDC,p_material:mat,p_qty:qty,p_batch:batch});
     let h='<div class="eyebrow">Saran lokasi</div>';
     res.forEach(r=>{
@@ -895,7 +938,7 @@ async function loadArsip(){
         <button class="btn ghost" style="margin-bottom:8px" onclick="arDownload('${esc(r.period)}')">⬇ Unduh Excel</button>
         ${r.exported && r.purgeable && ROLE==='master'
           ? `<button class="btn" style="background:var(--stop)" onclick="arPurge('${esc(r.period)}')">Hapus dari database</button>`
-          : `<div class="muted" style="font-size:12px">${!r.exported?'Unduh dulu sebelum bisa dihapus.':(!r.purgeable?'Belum boleh dihapus — data kurang dari 2 bulan.':'Hanya RDC Manager yang bisa menghapus.')}</div>`}
+          : `<div class="muted" style="font-size:12px">${!r.exported?'Unduh dulu sebelum bisa dihapus.':(!r.purgeable?'Belum boleh dihapus — data kurang dari 2 bulan.':'Penghapusan hanya dapat dilakukan setelah approval MASTER.')}</div>`}
       </div>`).join('');
   }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
 }
@@ -911,10 +954,18 @@ async function arDownload(period){
   }catch(e){ alert('Gagal: '+e.message); }
 }
 async function arPurge(period){
-  if(!confirm(`Hapus transaksi ${period} dari database?\n\nPastikan file Excel sudah tersimpan aman. Ringkasan bulanan tetap ada.`)) return;
-  try{ const r=await rpc('wms_archive_purge',{p_rdc:RDC,p_period:period});
-    alert(`${r.deleted_rows} baris dihapus.`); loadArsip(); loadHome(); }
-  catch(e){ alert('Gagal: '+e.message); }
+  if(ROLE!=='master'){ alert('Penghapusan arsip memerlukan approval MASTER.'); return; }
+  const reason=prompt(`APPROVAL MASTER — Hapus transaksi ${period}
+
+Masukkan alasan penghapusan:`,'');
+  if(reason===null) return;
+  if(!reason.trim()){ alert('Alasan penghapusan wajib diisi.'); return; }
+  const code=prompt(`Konfirmasi final. Ketik HAPUS ${period} untuk melanjutkan:`,'');
+  if(code!==`HAPUS ${period}`){ alert('Konfirmasi tidak sesuai. Penghapusan dibatalkan.'); return; }
+  try{
+    const r=await rpc('wms_archive_purge',{p_rdc:RDC,p_period:period});
+    alert(`${r.deleted_rows} baris dihapus dengan approval MASTER.`); loadArsip(); loadHome();
+  }catch(e){ alert('Gagal: '+e.message); }
 }
 
 // hook screen loads
@@ -1520,25 +1571,31 @@ function renderStAdmin(){
   if(ROLE!=='master'){ el.innerHTML=''; return; }
   el.innerHTML=`<div class="card" style="border-color:#EFC4C0">
     <div style="font-weight:650;font-size:13.5px;color:var(--stop);margin-bottom:6px">Hapus stock (khusus masa trial)</div>
-    <div class="muted" style="font-size:12px;margin-bottom:10px">Centang baris di atas lalu hapus, atau hapus seluruh stock RDC ini. Semua penghapusan tercatat di riwayat.</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Penghapusan hanya untuk kondisi khusus dan memerlukan approval MASTER + alasan + konfirmasi berlapis. Gunakan dengan sangat hati-hati.</div>
     <button class="btn" style="background:var(--stop);margin-bottom:8px" onclick="stDelete(false)">Hapus yang dicentang</button>
     <button class="btn ghost" onclick="stDelete(true)">Hapus SEMUA stock ${esc(RDC)}</button>
     <div id="stDelMsg" style="font-size:13px;margin-top:8px"></div></div>`;
 }
 async function stDelete(all){
   const msg=document.getElementById('stDelMsg');
+  if(ROLE!=='master'){msg.style.color='var(--stop)';msg.textContent='Penghapusan stock memerlukan approval MASTER.';return;}
   let ids=[];
   if(!all){
     document.querySelectorAll('.stChk:checked').forEach(c=>ids.push(c.value));
     if(!ids.length){msg.style.color='var(--stop)';msg.textContent='Belum ada baris yang dicentang.';return;}
   }
-  const konf = all ? `HAPUS SELURUH stock ${RDC}?\n\nIni menghapus ${fmt(ST_TOTAL)} baris. Tindakan ini untuk masa trial saja.`
-                   : `Hapus ${ids.length} baris terpilih?`;
-  if(!confirm(konf)) return;
-  msg.style.color='var(--muted)'; msg.textContent='Menghapus…';
+  const reason=prompt(`APPROVAL MASTER — ${all?'Hapus seluruh stock RDC '+RDC:'Hapus '+ids.length+' baris stock'}
+
+Masukkan alasan penghapusan:`,'');
+  if(reason===null) return;
+  if(!reason.trim()){msg.style.color='var(--stop)';msg.textContent='Alasan penghapusan wajib diisi.';return;}
+  const expected=all?`HAPUS SEMUA ${RDC}`:`HAPUS ${ids.length}`;
+  const code=prompt(`Konfirmasi final. Ketik ${expected} untuk melanjutkan:`,'');
+  if(code!==expected){msg.style.color='var(--warn)';msg.textContent='Konfirmasi tidak sesuai. Penghapusan dibatalkan.';return;}
+  msg.style.color='var(--muted)'; msg.textContent='Menghapus dengan approval MASTER…';
   try{
-    const r=await rpc('wms_stock_delete',{p_rdc:RDC,p_ids:all?null:ids,p_all:all,p_alasan:'Pembersihan trial'});
-    msg.style.color='var(--ok)'; msg.textContent=`✓ ${fmt(r.dihapus)} baris (${fmt(r.box)} box) dihapus.`;
+    const r=await rpc('wms_stock_delete',{p_rdc:RDC,p_ids:all?null:ids,p_all:all,p_alasan:reason.trim()});
+    msg.style.color='var(--ok)'; msg.textContent=`✓ ${fmt(r.dihapus)} baris (${fmt(r.box)} box) dihapus dengan approval MASTER.`;
     ST_PAGE=0; loadStock(); loadHome(); loadLoc();
   }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
 }
@@ -1820,36 +1877,193 @@ document.getElementById('kpSave').addEventListener('click',async()=>{
   }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
 });
 
+
+// ================= ZONASI UKURAN + KLASIFIKASI MATERIAL =================
+// Frontend-compatible persistence. Data is scoped per RDC and survives browser reloads.
+// When a server-side table/RPC is added later, these helpers can be replaced without changing the UI.
+let ZN_MATERIALS=[];
+const znKey=()=>`wms_size_zones_${RDC||'NA'}`;
+const zmKey=()=>`wms_material_size_${RDC||'NA'}`;
+function znRead(){try{return JSON.parse(localStorage.getItem(znKey())||'[]')}catch(e){return []}}
+function znWrite(v){localStorage.setItem(znKey(),JSON.stringify(v||[]));}
+function zmRead(){try{return JSON.parse(localStorage.getItem(zmKey())||'{}')}catch(e){return {}}}
+function zmWrite(v){localStorage.setItem(zmKey(),JSON.stringify(v||{}));}
+function normSize(v){return String(v||'').trim().toUpperCase().replace(/\s+/g,'').replace(/[×X]/g,'x');}
+function getMaterialSizeCategory(mat){const m=zmRead();return m[String(mat||'').trim().toUpperCase()]||null;}
+function getZoneForMaterial(mat){
+  const size=getMaterialSizeCategory(mat); if(!size) return null;
+  const zones=znRead().filter(z=>normSize(z.size)===normSize(size));
+  return zones.length?zones:null;
+}
+async function loadZoneMaster(){
+  const whSel=document.getElementById('znWh'); if(!whSel) return;
+  try{
+    const [whs,blocks]=await Promise.all([
+      rpc('wms_warehouse_options',{p_rdc:RDC}).catch(()=>[]),
+      rpc('wms_block_options',{p_rdc:RDC}).catch(()=>[])]);
+    whSel.innerHTML=(whs||[]).map(w=>`<option value="${w.warehouse_id}" data-g="${esc(w.gudang)}">Gudang ${esc(w.gudang)}</option>`).join('');
+    whSel.onchange=()=>renderZoneBlocks(blocks||[]);
+    whSel._blocks=blocks||[];
+    renderZoneBlocks(blocks||[]);
+  }catch(e){ document.getElementById('znMsg').textContent='Gagal memuat master lokasi: '+e.message; }
+  renderZones();
+  await loadZoneMaterials();
+}
+function renderZoneBlocks(blocks){
+  const sel=document.getElementById('znWh'), box=document.getElementById('znBlocks'); if(!sel||!box) return;
+  const gud=sel.options[sel.selectedIndex]?.dataset.g||'';
+  const rows=(blocks||[]).filter(b=>String(b.gudang)===String(gud));
+  box.innerHTML=rows.length?rows.map(b=>`<label style="display:flex;align-items:center;gap:8px;text-transform:none;font-family:inherit;font-size:13px;margin:5px 0;color:var(--ink)"><input type="checkbox" class="znBlk" value="${b.block_id}" data-code="${esc(b.block)}" style="width:18px;height:18px">Block ${esc(b.block)} <span class="muted">(${fmt(b.jml_kavling)} kavling)</span></label>`).join(''):'<div class="muted">Belum ada block pada gudang ini.</div>';
+}
+function zoneSizes(){return [...new Set(znRead().map(z=>normSize(z.size)).filter(Boolean))].sort();}
+function renderZones(){
+  const rows=znRead(), out=document.getElementById('znList'); if(!out) return;
+  const grouped={}; rows.forEach(z=>(grouped[z.gudang]=grouped[z.gudang]||[]).push(z));
+  let h=''; Object.keys(grouped).sort().forEach(g=>{
+    const total=grouped[g].reduce((a,z)=>a+Number(z.pct||0),0);
+    h+=`<div class="eyebrow">Gudang ${esc(g)} · alokasi ${total}%</div><div class="card" style="padding:4px 14px">`+
+      grouped[g].map(z=>`<div class="lrow"><div class="g"><div class="t">Zona ${esc(z.size)}</div><div class="s">${Number(z.pct)||0}% luas${z.blocks?.length?' · Block '+z.blocks.map(b=>esc(b.code)).join(', '):' · block belum ditentukan'}${z.note?' · '+esc(z.note):''}</div></div><button class="btn ghost" style="width:auto;padding:6px 10px;font-size:12px" onclick="deleteZone('${z.id}')">Hapus</button></div>`).join('')+'</div>';
+  });
+  out.innerHTML=h||'<div class="card muted">Belum ada zonasi ukuran.</div>';
+  const zs=zoneSizes(), sel=document.getElementById('zmSize');
+  if(sel) sel.innerHTML=zs.length?zs.map(x=>`<option>${esc(x)}</option>`).join(''):'<option value="">Buat zona dahulu</option>';
+  refreshHomeZoneAlert();
+}
+document.getElementById('znSave')?.addEventListener('click',()=>{
+  const msg=document.getElementById('znMsg'), wh=document.getElementById('znWh');
+  const gud=wh.options[wh.selectedIndex]?.dataset.g||'', wid=wh.value;
+  const size=normSize(document.getElementById('znSize').value), pct=Number(document.getElementById('znPct').value);
+  const note=document.getElementById('znNote').value.trim();
+  const blocks=[...document.querySelectorAll('.znBlk:checked')].map(x=>({id:Number(x.value),code:x.dataset.code}));
+  if(!gud||!size||!isFinite(pct)||pct<=0){msg.style.color='var(--stop)';msg.textContent='Gudang, kategori ukuran, dan % luas wajib diisi.';return;}
+  const rows=znRead();
+  const current=rows.filter(z=>z.gudang===gud).reduce((a,z)=>a+Number(z.pct||0),0);
+  if(current+pct>100.0001){msg.style.color='var(--stop)';msg.textContent=`Total alokasi Gudang ${gud} menjadi ${current+pct}%. Maksimal 100%.`;return;}
+  const duplicate=rows.some(z=>z.gudang===gud&&normSize(z.size)===size);
+  if(duplicate){msg.style.color='var(--stop)';msg.textContent=`Zona ${size} di Gudang ${gud} sudah ada.`;return;}
+  rows.push({id:'Z'+Date.now(),warehouse_id:Number(wid),gudang:gud,size,pct,blocks,note,created_at:new Date().toISOString()}); znWrite(rows);
+  msg.style.color='var(--ok)';msg.textContent='✓ Zona ukuran tersimpan.';
+  document.getElementById('znSize').value='';document.getElementById('znPct').value='';document.getElementById('znNote').value='';
+  document.querySelectorAll('.znBlk:checked').forEach(x=>x.checked=false); renderZones(); renderZoneMaterials();
+});
+function deleteZone(id){
+  if(!confirm('Hapus zonasi ini? Mapping material tetap tersimpan, tetapi putaway perlu zona ukuran yang tersedia.')) return;
+  znWrite(znRead().filter(z=>z.id!==id)); renderZones(); renderZoneMaterials();
+}
+async function loadZoneMaterials(){
+  const out=document.getElementById('zmList'); if(!out) return;
+  out.innerHTML='<div class="card muted">⏳ Memuat daftar material…</div>';
+  try{
+    const [stock,unloc,pallet]=await Promise.all([
+      rpc('wms_stock_search',{p_rdc:RDC,p_motif:'',p_seri:'',p_gudang:'',p_block:'',p_kavling:'',p_status:'',p_limit:5000,p_offset:0}).catch(()=>({rows:[]})),
+      rpc('wms_unlocated',{p_rdc:RDC,p_limit:5000}).catch(()=>[]),
+      rpc('wms_pallet_list',{p_rdc:RDC}).catch(()=>[])]);
+    const map={};
+    (stock.rows||[]).forEach(r=>{const k=String(r.material_code||'').toUpperCase();if(k)map[k]={material:k,desc:r.motif||r.desc||'',batch:r.batch||''};});
+    (unloc||[]).forEach(r=>{const k=String(r.material_code||'').toUpperCase();if(k)map[k]={material:k,desc:r.desc||'',batch:r.batch||''};});
+    // Existing pallet master can provide a safe suggestion only; it does not auto-assign.
+    const suggestions={}; (pallet||[]).forEach(p=>{if(p.ukuran&&p.kode_motif)suggestions[String(p.kode_motif).toUpperCase()]=normSize(p.ukuran);});
+    ZN_MATERIALS=Object.values(map).sort((a,b)=>a.material.localeCompare(b.material)).map(m=>{let sug=null,best=0;Object.keys(suggestions).forEach(pre=>{if(m.material.startsWith(pre)&&pre.length>best){best=pre.length;sug=suggestions[pre];}});return {...m,suggested:sug};});
+    renderZoneMaterials();
+  }catch(e){out.innerHTML=`<div class="card muted">Gagal memuat material: ${esc(e.message)}</div>`;}
+}
+function renderZoneMaterials(){
+  const out=document.getElementById('zmList'), alert=document.getElementById('zmAlert'); if(!out) return;
+  const q=(document.getElementById('zmSearch')?.value||'').trim().toUpperCase(), mp=zmRead();
+  const rows=ZN_MATERIALS.filter(m=>!q||m.material.includes(q)||String(m.desc||'').toUpperCase().includes(q)).slice(0,500);
+  const uncat=ZN_MATERIALS.filter(m=>!mp[m.material]).length;
+  if(alert) alert.innerHTML=uncat?`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg)"><div style="font-weight:650;color:var(--warn)">${fmt(uncat)} material belum memiliki kategori ukuran</div><div class="muted" style="font-size:12px;margin-top:4px">Material baru/unknown akan ditahan dari Putaway sampai kategori ukuran ditetapkan.</div></div>`:`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)"><div style="font-weight:650;color:var(--ok)">Semua material sudah dikategorikan.</div></div>`;
+  out.innerHTML=rows.length?`<div class="card" style="padding:4px 14px">${rows.map(m=>`<div class="lrow"><input type="checkbox" class="zmChk" value="${esc(m.material)}" style="width:18px;height:18px;flex:0 0 auto"><div class="g"><div class="t">${esc(m.material)}</div><div class="s">${esc(m.desc||'')}${m.suggested&&!mp[m.material]?' · saran dari master: '+esc(m.suggested):''}</div></div><div style="text-align:right">${mp[m.material]?`<span class="pill p-ok">${esc(mp[m.material])}</span>`:'<span class="pill p-warn">BELUM DIATUR</span>'}</div></div>`).join('')}</div>`:'<div class="card muted">Tidak ada material yang cocok.</div>';
+  refreshHomeZoneAlert();
+}
+document.getElementById('zmSearch')?.addEventListener('input',renderZoneMaterials);
+document.getElementById('zmAssign')?.addEventListener('click',()=>{
+  const msg=document.getElementById('zmMsg'), size=normSize(document.getElementById('zmSize').value);
+  const ids=[...document.querySelectorAll('.zmChk:checked')].map(x=>String(x.value).toUpperCase());
+  if(!size){msg.style.color='var(--stop)';msg.textContent='Belum ada kategori ukuran. Buat zonasi dahulu.';return;}
+  if(!ids.length){msg.style.color='var(--stop)';msg.textContent='Pilih minimal satu material.';return;}
+  const mp=zmRead(); ids.forEach(id=>mp[id]=size); zmWrite(mp);
+  msg.style.color='var(--ok)';msg.textContent=`✓ ${ids.length} material ditetapkan ke kategori ${size}.`; renderZoneMaterials();
+});
+function refreshHomeZoneAlert(){
+  const el=document.getElementById('homeZoneAlert'); if(!el) return;
+  const mp=zmRead(), known=new Set(ZN_MATERIALS.map(m=>m.material));
+  const n=[...known].filter(k=>!mp[k]).length;
+  const zones=znRead(), by={}; zones.forEach(z=>(by[z.gudang]=by[z.gudang]||0,by[z.gudang]+=Number(z.pct||0)));
+  const incomplete=Object.entries(by).filter(([g,p])=>p<99.999).map(([g,p])=>`${g} ${p}%`);
+  let parts=[]; if(n)parts.push(`${fmt(n)} material belum dikategorikan`); if(incomplete.length)parts.push(`alokasi zonasi belum 100%: ${incomplete.join(', ')}`);
+  el.innerHTML=parts.length?`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg);margin-top:12px"><div style="font-weight:650;color:var(--warn)">Perlu perhatian zonasi ukuran</div><div class="muted" style="font-size:12px;margin-top:4px">${esc(parts.join(' · '))}</div></div>`:'';
+}
+const _goZone=go;
+go=function(s){_goZone(s);if(s==='zone')loadZoneMaster();};
+
 // ================= OCCUPANCY =================
 async function loadOccupancy(){
   const el=document.getElementById('occOut');
-  el.innerHTML='<div class="card muted">⏳ Menghitung…</div>';
+  el.innerHTML='<div class="card muted">⏳ Menghitung occupancy box…</div>';
   try{
+    // Jalur utama: RPC existing. Fungsi ini seharusnya READ ONLY.
     const d=await rpc('wms_occupancy',{p_rdc:RDC});
-    const pill=s=>s==='OVERLOAD'?'p-stop':s==='HAMPIR PENUH'?'p-warn':s==='BELUM DIATUR'?'p-warn':'p-ok';
-    let h=`<div class="kpi" style="margin-bottom:12px">
-      <div class="lbl">Occupancy ${esc(d.rdc)}</div>
-      <div class="val">${d.persen!=null?d.persen:'—'}<small>%</small></div>
-      <div class="muted" style="font-size:12px;margin-top:4px">${fmt(d.total_isi)} / ${fmt(d.total_max)} box</div></div>`;
-    if(Number(d.box_belum_diatur)>0){
-      h+=`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg);margin-bottom:12px">
-        <div style="font-weight:650;color:var(--warn);font-size:13.5px">${fmt(d.box_belum_diatur)} box belum masuk hitungan</div>
-        <div class="muted" style="font-size:12px;margin-top:4px">Ukurannya belum diatur di Master Isi Pallet, atau kapasitasnya belum ditetapkan. Angka di atas belum mencakup ini.</div></div>`;
+    renderOccupancyBox(d,el,false);
+  }catch(e){
+    // Fallback aman: hitung di browser hanya dari endpoint READ ONLY.
+    // Menghindari layar gagal total bila RPC occupancy backend bermasalah.
+    try{
+      const d=await occupancyBoxFallback();
+      renderOccupancyBox(d,el,true);
+    }catch(e2){
+      el.innerHTML=`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">
+        <div style="font-weight:650;color:var(--stop)">Occupancy gagal dimuat</div>
+        <div class="muted" style="font-size:12px;margin-top:5px">${esc(e2.message||e.message)}</div></div>`;
     }
-    h+='<div class="eyebrow">Per gudang</div><div class="card" style="padding:4px 14px">'+
-      (d.per_gudang||[]).map(g=>`<div class="lrow"><div class="g">
-        <div class="t">Gudang ${esc(g.gudang)}</div>
-        <div class="s">${fmt(g.isi)} / ${fmt(g.max_box)} box${Number(g.box_belum_diatur)>0?' · '+fmt(g.box_belum_diatur)+' belum diatur':''}</div></div>
-        <div style="text-align:right"><div class="n">${g.persen!=null?g.persen+'%':'—'}</div>
-        ${g.ada_overload?'<span class="pill p-stop" style="font-size:9px">ADA OVERLOAD</span>':''}</div></div>`).join('')+'</div>';
-    h+='<div class="eyebrow">Rincian per ukuran</div><div class="card" style="padding:4px 14px">'+
-      (d.detail||[]).map(x=>`<div class="lrow"><div class="g">
-        <div class="t">${esc(x.gudang)} · ${esc(x.ukuran)}</div>
-        <div class="s">${fmt(x.isi)}${x.max_box?' / '+fmt(x.max_box):''} box</div></div>
-        <div style="text-align:right"><div class="n" ${x.status==='OVERLOAD'?'style="color:var(--stop)"':''}>${x.persen!=null?x.persen+'%':'—'}</div>
-        <span class="pill ${pill(x.status)}" style="font-size:9px">${esc(x.status)}</span></div></div>`).join('')+'</div>';
-    el.innerHTML=h;
-  }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+  }
+}
+function renderOccupancyBox(d,el,isFallback){
+  const pill=s=>s==='OVERLOAD'?'p-stop':s==='HAMPIR PENUH'?'p-warn':s==='BELUM DIATUR'?'p-warn':'p-ok';
+  let h='';
+  if(isFallback) h+=`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg);margin-bottom:10px"><div style="font-weight:650;color:var(--warn)">Mode fallback aktif</div><div class="muted" style="font-size:12px;margin-top:4px">RPC occupancy backend sedang bermasalah. Angka dihitung read-only dari Stock On Hand + Master Kapasitas, sehingga tidak ada data yang dihapus/diubah.</div></div>`;
+  h+=`<div class="kpi" style="margin-bottom:12px">
+    <div class="lbl">Occupancy ${esc(d.rdc||RDC)}</div>
+    <div class="val">${d.persen!=null?d.persen:'—'}<small>%</small></div>
+    <div class="muted" style="font-size:12px;margin-top:4px">${fmt(d.total_isi)} / ${fmt(d.total_max)} box</div></div>`;
+  if(Number(d.box_belum_diatur)>0){
+    h+=`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg);margin-bottom:12px">
+      <div style="font-weight:650;color:var(--warn);font-size:13.5px">${fmt(d.box_belum_diatur)} box belum masuk hitungan occupancy</div>
+      <div class="muted" style="font-size:12px;margin-top:4px">Material belum memiliki kategori ukuran atau ukuran tersebut belum memiliki master kapasitas.</div></div>`;
+  }
+  h+='<div class="eyebrow">Per gudang</div><div class="card" style="padding:4px 14px">'+
+    (d.per_gudang||[]).map(g=>`<div class="lrow"><div class="g"><div class="t">Gudang ${esc(g.gudang)}</div>
+      <div class="s">${fmt(g.isi)} / ${fmt(g.max_box)} box${Number(g.box_belum_diatur)>0?' · '+fmt(g.box_belum_diatur)+' belum diatur':''}</div></div>
+      <div style="text-align:right"><div class="n">${g.persen!=null?g.persen+'%':'—'}</div>${g.ada_overload?'<span class="pill p-stop" style="font-size:9px">ADA OVERLOAD</span>':''}</div></div>`).join('')+'</div>';
+  h+='<div class="eyebrow">Rincian per ukuran</div><div class="card" style="padding:4px 14px">'+
+    (d.detail||[]).map(x=>`<div class="lrow"><div class="g"><div class="t">${esc(x.gudang)} · ${esc(x.ukuran)}</div>
+      <div class="s">${fmt(x.isi)}${x.max_box?' / '+fmt(x.max_box):''} box</div></div>
+      <div style="text-align:right"><div class="n" ${x.status==='OVERLOAD'?'style="color:var(--stop)"':''}>${x.persen!=null?x.persen+'%':'—'}</div>
+      <span class="pill ${pill(x.status)}" style="font-size:9px">${esc(x.status)}</span></div></div>`).join('')+'</div>';
+  el.innerHTML=h;
+}
+async function occupancyBoxFallback(){
+  const [caps,stock,pallet]=await Promise.all([
+    rpc('wms_size_capacity_list',{p_rdc:RDC}),
+    rpc('wms_stock_search',{p_rdc:RDC,p_motif:'',p_seri:'',p_gudang:'',p_block:'',p_kavling:'',p_status:'',p_limit:5000,p_offset:0}),
+    rpc('wms_pallet_list',{p_rdc:RDC}).catch(()=>[])
+  ]);
+  const localMap=(typeof zmRead==='function'?zmRead():{});
+  const prefixes=(pallet||[]).filter(p=>p.ukuran&&p.kode_motif).sort((a,b)=>String(b.kode_motif).length-String(a.kode_motif).length);
+  const getSize=mat=>{
+    const k=String(mat||'').toUpperCase(); if(localMap[k]) return normSize(localMap[k]);
+    const p=prefixes.find(x=>k.startsWith(String(x.kode_motif||'').toUpperCase())); return p?normSize(p.ukuran):null;
+  };
+  const capMap={}, detailMap={};
+  (caps||[]).forEach(c=>{ const g=String(c.gudang||''),u=normSize(c.ukuran); capMap[g+'|'+u]=Number(c.max_box||0); detailMap[g+'|'+u]={gudang:g,ukuran:u,isi:0,max_box:Number(c.max_box||0)}; });
+  let unassigned=0;
+  (stock.rows||[]).forEach(r=>{ const q=Number(r.qty||0),g=String(r.gudang||''); const u=getSize(r.material_code); const k=u?g+'|'+u:null;
+    if(!u||!capMap[k]){unassigned+=q;return;} if(!detailMap[k])detailMap[k]={gudang:g,ukuran:u,isi:0,max_box:capMap[k]||0}; detailMap[k].isi+=q; });
+  const detail=Object.values(detailMap).map(x=>{x.persen=x.max_box?Math.round(x.isi/x.max_box*1000)/10:null;x.status=x.persen==null?'BELUM DIATUR':x.persen>100?'OVERLOAD':x.persen>=90?'HAMPIR PENUH':'NORMAL';return x;});
+  const by={}; detail.forEach(x=>{const g=by[x.gudang]||(by[x.gudang]={gudang:x.gudang,isi:0,max_box:0,box_belum_diatur:0,ada_overload:false});g.isi+=x.isi;g.max_box+=x.max_box;g.ada_overload=g.ada_overload||x.status==='OVERLOAD';});
+  Object.values(by).forEach(g=>g.persen=g.max_box?Math.round(g.isi/g.max_box*1000)/10:null);
+  const total_isi=detail.reduce((a,x)=>a+x.isi,0), total_max=detail.reduce((a,x)=>a+x.max_box,0);
+  return {rdc:RDC,total_isi,total_max,persen:total_max?Math.round(total_isi/total_max*1000)/10:null,box_belum_diatur:unassigned,per_gudang:Object.values(by),detail};
 }
 ['kpSize','pmSize'].forEach(id=>{const el=document.getElementById(id);
   if(el){el.style.textTransform='uppercase';
