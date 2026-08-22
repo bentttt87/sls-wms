@@ -218,16 +218,17 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 </div></section>
 
 <section class="screen" id="s-put"><div class="wrap">
-  <div class="eyebrow">Barang masuk — cari lokasi</div>
-  <div class="hint">Sistem memilihkan kavling. Anda tinggal setujui atau ganti.</div>
-  <div id="puSizeGate"></div>
+  <div class="eyebrow">Receiving / Putaway</div>
+  <div class="hint">Putaway hanya untuk stock SAP yang belum memiliki lokasi. Pilih dari menu Stock Belum Ada Lokasi; sistem tidak membuat stock baru.</div>
+  <button class="btn ghost" style="margin-bottom:10px" onclick="go('unloc')">Lihat Stock SAP Belum Ada Lokasi</button>
+  <div id="puSizeGate"></div><input type="hidden" id="puMaxQty" value="0">
   <div class="card">
     <div class="row" style="margin-bottom:10px">
-      <div><label>Material</label><input id="puMat" placeholder="AGT912214R"></div>
-      <div style="max-width:120px"><label>Series</label><input id="puBatch" placeholder="S09"></div>
+      <div><label>Material</label><input id="puMat" placeholder="Pilih dari Stock Belum Ada Lokasi" readonly></div>
+      <div style="max-width:120px"><label>Series</label><input id="puBatch" placeholder="Series" readonly></div>
     </div>
     <div class="row" style="margin-bottom:12px">
-      <div><label>Qty (box)</label><input id="puQty" inputmode="numeric" placeholder="100"></div>
+      <div><label>Qty (box)</label><input id="puQty" inputmode="numeric" placeholder="Qty putaway" readonly></div>
       <div><label>Jenis</label><select id="puType"><option>Inbound</option><option>BTB</option><option>Retur</option><option>Others</option></select></div>
     </div>
     <button class="btn" id="puFind">Cari lokasi</button>
@@ -352,10 +353,16 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 
 
 <section class="screen" id="s-import"><div class="wrap">
-  <div class="eyebrow">Impor Layout &amp; Stock (FiTH)</div>
-  <div class="hint">Upload CSV/Excel dari FiTH berisi kolom Material_Code, Batch, Quantity, Warehouse, Block, Kavling. Kavling yang belum ada akan dibuat otomatis.</div>
+  <div class="eyebrow">Upload Lokasi Barang</div>
+  <div class="hint">Untuk RDC yang sudah memiliki layout lokasi. Upload Excel/CSV berisi Gudang, Block, Line, Kavling, Kapasitas Box, dan Luas m². Menu ini HANYA membuat master lokasi — tidak pernah membuat atau menambah stock.</div>
   <input type="file" id="impFile" accept=".csv,.xlsx,.xls" style="display:none">
-  <button class="btn ghost" onclick="document.getElementById('impFile').click()">📄 Pilih file layout/stock…</button>
+  <button class="btn ghost" onclick="document.getElementById('impFile').click()">📄 Upload file lokasi…</button>
+  <button class="btn ghost" id="impTemplate" style="margin-top:8px">⬇ Download template lokasi</button>
+  <div class="card" style="margin-top:12px">
+    <div style="font-weight:650;margin-bottom:6px">Tidak punya format lokasi?</div>
+    <div class="muted" style="font-size:12.5px;margin-bottom:10px">Buat langsung dari menu Struktur Gudang. User RDC dapat menambah Gudang → Block → Line → Kavling untuk RDC masing-masing.</div>
+    <button class="btn ghost" onclick="go('loc')">Buat lokasi di WMS</button>
+  </div>
   <div id="impOut" style="margin-top:14px"></div>
 </div></section>
 
@@ -397,7 +404,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div class="hint">Menghitung ulang stock "belum ada lokasi" = total SAP dikurangi yang sudah di kavling. Perlu persetujuan RDC Manager sebelum berlaku.</div>
   <div class="card">
     <label>Alasan (opsional)</label>
-    <input id="syReason" placeholder="mis. setelah impor lokasi dari FiTH" style="margin-bottom:12px">
+    <input id="syReason" placeholder="mis. setelah upload master lokasi" style="margin-bottom:12px">
     <button class="btn" id="syAsk">Ajukan penyelarasan</button>
     <div id="syMsg" style="font-size:13px;margin-top:8px"></div>
   </div>
@@ -521,7 +528,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
     <div class="lrow" style="cursor:pointer" onclick="go('sync')"><div class="g"><div class="t">Selaraskan dengan SAP</div><div class="s">Perlu persetujuan RDC Manager</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('transfer')"><div class="g"><div class="t">Pindah Lokasi Barang</div><div class="s">Mutasi antar kavling</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('tasks')"><div class="g"><div class="t">Tugas Picking</div><div class="s">Draft, revisi, eksekusi</div></div><div class="n muted">›</div></div>
-    <div class="lrow" style="cursor:pointer" onclick="go('import')"><div class="g"><div class="t">Impor Layout &amp; Stock</div><div class="s">Dari FiTH / file kavling</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('import')"><div class="g"><div class="t">Upload Lokasi Barang</div><div class="s">Excel/CSV lokasi atau buat langsung di WMS</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('recon')"><div class="g"><div class="t">Validasi Harian SAP</div><div class="s">Bandingkan stock WMS vs SAP</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('unloc')"><div class="g"><div class="t">Stock Belum Ada Lokasi</div><div class="s">Perlu di-putaway ke kavling</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('rusak')"><div class="g"><div class="t">Catat Barang Rusak</div><div class="s">Pindahkan stock rusak + alasan</div></div><div class="n muted">›</div></div>
@@ -734,7 +741,10 @@ document.getElementById('puFind').addEventListener('click',async()=>{
   const batch=document.getElementById('puBatch').value.trim();
   const qty=parseFloat(document.getElementById('puQty').value);
   const msg=document.getElementById('puMsg'); msg.textContent='';
-  if(!mat||!isFinite(qty)||qty<=0){msg.style.color='var(--stop)';msg.textContent='Material dan qty wajib diisi.';return;}
+  const maxQty=parseFloat(document.getElementById('puMaxQty')?.value)||0;
+  if(!mat||!isFinite(qty)||qty<=0){msg.style.color='var(--stop)';msg.textContent='Pilih stock SAP dari menu Stock Belum Ada Lokasi.';return;}
+  if(maxQty<=0){msg.style.color='var(--stop)';msg.textContent='Putaway ditolak: stock harus berasal dari daftar SAP Belum Ada Lokasi.';return;}
+  if(qty>maxQty){msg.style.color='var(--stop)';msg.textContent=`Putaway ditolak: qty ${fmt(qty)} melebihi stock SAP belum berlokasi ${fmt(maxQty)} box.`;return;}
   try{
     const sizeCat=getMaterialSizeCategory(mat);
     const gate=document.getElementById('puSizeGate');
@@ -1080,7 +1090,8 @@ async function loadUnloc(){
       ? `<div class="card" style="padding:4px 14px">`+rows.map(r=>`
         <div class="lrow" style="cursor:pointer" onclick="prefillPutaway('${esc(r.material_code)}','${esc(r.batch)}',${r.qty})">
         <div class="g"><div class="t">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
-        <div class="s">${esc(r['desc']||'')}</div></div>
+        <div class="s">${esc(r['desc']||'')}</div>
+        ${typeof getMaterialSize==='function' && !getMaterialSize(r.material_code)?'<div style="font-size:11px;color:var(--warn);margin-top:3px">⚠ MATERIAL BARU — kategori ukuran wajib ditentukan sebelum Putaway</div>':''}</div>
         <div style="text-align:right"><div class="n">${fmt(r.qty)}</div>
         ${r.status==='DAMAGED'?'<span class="pill p-stop">RUSAK</span>':'<span class="pill p-warn">PERLU LOKASI</span>'}</div></div>`).join('')+`</div>`
       : `<div class="card muted">Semua stock sudah punya lokasi.</div>`;
@@ -1090,6 +1101,7 @@ function prefillPutaway(mat,batch,qty){
   document.getElementById('puMat').value=mat;
   document.getElementById('puBatch').value=batch;
   document.getElementById('puQty').value=qty;
+  document.getElementById('puMaxQty').value=qty;
   go('put');
   document.getElementById('puFind').click();
 }
@@ -1226,37 +1238,47 @@ async function loadReconHist(){
 const _go3=go;
 go=function(s){ _go3(s); if(s==='recon') loadReconHist(); };
 
-// ================= IMPOR LAYOUT & STOCK (FiTH) =================
+// ================= UPLOAD LOKASI BARANG (LAYOUT ONLY) =================
 let IMP_ROWS=null;
 document.getElementById('impFile').addEventListener('change',e=>{ if(e.target.files.length) readImport(e.target.files[0]); e.target.value=''; });
+document.getElementById('impTemplate')?.addEventListener('click',()=>{
+  const wb=XLSX.utils.book_new();
+  const data=[
+    ['Gudang','Block','Line','Kavling','Kapasitas_Box','Luas_m2'],
+    ['A','B01','L01','K01',500,12],
+    ['A','B01','L01','K02',500,12],
+    ['B','B01','','K01',400,10]
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:14},{wch:14},{wch:14},{wch:14},{wch:18},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws,'Template Lokasi');
+  XLSX.writeFile(wb,'Template_Upload_Lokasi_Barang_WMS.xlsx');
+});
 function readImport(file){
   const out=document.getElementById('impOut');
-  out.innerHTML='<div class="card muted">⏳ Membaca file…</div>';
+  out.innerHTML='<div class="card muted">⏳ Membaca file lokasi…</div>';
   const fr=new FileReader();
   fr.onload=ev=>{
     try{
       const wb=XLSX.read(ev.target.result,{type:'binary'});
       const rows=parseLayout(wb);
-      if(!rows.length){out.innerHTML='<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">File tidak dikenali. Perlu kolom Warehouse, Block, Kavling (Material_Code/Quantity opsional).</div>';return;}
+      if(!rows.length){
+        out.innerHTML='<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">File tidak dikenali. Gunakan kolom Gudang/Warehouse, Block, Line (opsional), Kavling, Kapasitas_Box (opsional), Luas_m2 (opsional). Tidak boleh ada stock/material/qty pada upload lokasi.</div>';return;
+      }
       IMP_ROWS=rows;
-      const kav=new Set(rows.map(r=>r.warehouse+'|'+r.block+'|'+r.kavling));
+      const kav=new Set(rows.map(r=>r.warehouse+'|'+r.block+'|'+r.line+'|'+r.kavling));
       const wh=new Set(rows.map(r=>r.warehouse));
       const bl=new Set(rows.map(r=>r.warehouse+'|'+r.block));
-      const withQty=rows.filter(r=>r.material&&r.qty>0);
-      const tot=withQty.reduce((s,r)=>s+r.qty,0);
       out.innerHTML=`<div class="card">
         <div style="font-weight:650;margin-bottom:10px">${esc(file.name)}</div>
         <div class="kpis" style="grid-template-columns:1fr 1fr">
           <div class="kpi"><div class="lbl">Gudang</div><div class="val">${fmt(wh.size)}</div></div>
           <div class="kpi"><div class="lbl">Block</div><div class="val">${fmt(bl.size)}</div></div>
           <div class="kpi"><div class="lbl">Kavling</div><div class="val">${fmt(kav.size)}</div></div>
-          <div class="kpi"><div class="lbl">Total Stock</div><div class="val">${fmt(tot)} <small>box</small></div></div>
+          <div class="kpi"><div class="lbl">Stock Diimpor</div><div class="val">0 <small>box</small></div></div>
         </div>
-        <div class="muted" style="font-size:12.5px;margin-top:10px">${fmt(withQty.length)} baris stock dari ${fmt(rows.length)} baris file.</div>
-        <label style="margin-top:12px">Kapasitas per kavling (opsional)</label>
-        <input id="impKap" inputmode="numeric" placeholder="kosongkan bila belum tahu" style="margin-bottom:12px">
-        <button class="btn brand" id="impGo">Impor lokasi &amp; stock</button>
-        <p class="muted" style="font-size:12px;text-align:center;margin:8px 0 0">Kavling yang sudah ada tidak diduplikasi. Stock ditambahkan ke kavlingnya.</p>
+        <div class="muted" style="font-size:12.5px;margin-top:10px">Upload ini hanya membuat/update MASTER LOKASI. Stock tetap hanya berasal dari Upload Stock SAP.</div>
+        <button class="btn brand" id="impGo" style="margin-top:12px">Impor lokasi</button>
       </div>`;
       document.getElementById('impGo').onclick=runImport;
     }catch(err){ out.innerHTML=`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal membaca: ${esc(err.message)}</div>`; }
@@ -1264,31 +1286,41 @@ function readImport(file){
   fr.readAsBinaryString(file);
 }
 function parseLayout(wb){
+  const aliases={
+    warehouse:['warehouse','gudang'],
+    block:['block','blok'],
+    line:['line','baris'],
+    kavling:['kavling','location','lokasi'],
+    kapasitas:['kapasitas_box','capacity_box','kapasitas','capacity','max_box'],
+    luas:['luas_m2','luas','area_m2','area']
+  };
+  const idx=(H,names)=>{for(const n of names){const i=H.indexOf(n);if(i>=0)return i;}return -1;};
   for(const sn of wb.SheetNames){
     const g=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null,raw:true});
     if(!g.length) continue;
-    let hr=-1;
-    for(let i=0;i<Math.min(g.length,10);i++){
-      const h=(g[i]||[]).map(x=>String(x||'').trim().toLowerCase().replace(/^\ufeff/,''));
-      if(h.includes('warehouse')&&h.includes('kavling')){hr=i;break;}
+    let hr=-1,H=[];
+    for(let i=0;i<Math.min(g.length,15);i++){
+      H=(g[i]||[]).map(x=>String(x||'').trim().toLowerCase().replace(/^\ufeff/,'').replace(/\s+/g,'_'));
+      if(idx(H,aliases.warehouse)>=0 && idx(H,aliases.kavling)>=0){hr=i;break;}
     }
     if(hr<0) continue;
-    const H=(g[hr]||[]).map(x=>String(x||'').trim().toLowerCase().replace(/^\ufeff/,''));
-    const c=n=>H.indexOf(n);
-    const cW=c('warehouse'),cB=c('block'),cK=c('kavling'),
-          cM=c('material_code')>=0?c('material_code'):c('material'),
-          cBa=c('batch'),cQ=c('quantity')>=0?c('quantity'):c('qty');
+    const cW=idx(H,aliases.warehouse),cB=idx(H,aliases.block),cL=idx(H,aliases.line),
+          cK=idx(H,aliases.kavling),cKap=idx(H,aliases.kapasitas),cLuas=idx(H,aliases.luas);
+    const forbidden=['material','material_code','sku','batch','series','quantity','qty','stock'];
+    if(forbidden.some(x=>H.includes(x))){
+      throw new Error('File lokasi mengandung kolom stock/material/qty. Hapus kolom tersebut; stock hanya boleh berasal dari SAP.');
+    }
     const out=[];
     for(let i=hr+1;i<g.length;i++){
       const r=g[i]; if(!r) continue;
       const w=r[cW]==null?'':String(r[cW]).trim();
       const b=cB>=0&&r[cB]!=null?String(r[cB]).trim():'';
+      const l=cL>=0&&r[cL]!=null?String(r[cL]).trim():'';
       const k=r[cK]==null?'':String(r[cK]).trim();
       if(!w||!k) continue;
-      out.push({warehouse:w,block:b||'-',kavling:k,
-        material:cM>=0&&r[cM]!=null?String(r[cM]).trim():'',
-        batch:cBa>=0&&r[cBa]!=null?String(r[cBa]).trim():'',
-        qty:cQ>=0?Number(r[cQ])||0:0});
+      out.push({warehouse:w,block:b||'-',line:l||'',kavling:k,
+        kapasitas:cKap>=0?Number(r[cKap])||null:null,
+        luas:cLuas>=0?Number(r[cLuas])||null:null});
     }
     if(out.length) return out;
   }
@@ -1296,28 +1328,27 @@ function parseLayout(wb){
 }
 async function runImport(){
   const b=document.getElementById('impGo'); b.disabled=true;
-  const kap=parseFloat(document.getElementById('impKap').value)||null;
   const out=document.getElementById('impOut');
-  const CH=400; let acc={gudang_baru:0,block_baru:0,kavling_baru:0,baris_stock:0,dilewati:0};
+  const CH=300; let acc={gudang_baru:0,block_baru:0,kavling_baru:0,dilewati:0};
   try{
     for(let i=0;i<IMP_ROWS.length;i+=CH){
       b.textContent=`⏳ Mengimpor ${Math.min(i+CH,IMP_ROWS.length)} / ${IMP_ROWS.length}…`;
+      // Backend guard: p_with_stock is ALWAYS false. Rows contain no material/qty fields.
       const r=await rpc('wms_import_layout',{p_rdc:RDC,p_rows:IMP_ROWS.slice(i,i+CH),
-        p_with_stock:true,p_default_kapasitas:kap});
+        p_with_stock:false,p_default_kapasitas:null});
       Object.keys(acc).forEach(k=>acc[k]+=Number(r[k]||0));
     }
     out.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
-      <div style="font-weight:650;color:var(--ok);margin-bottom:6px">Impor selesai.</div>
+      <div style="font-weight:650;color:var(--ok);margin-bottom:6px">Upload lokasi selesai.</div>
       <div class="muted" style="font-size:13px;line-height:1.7">
         Gudang baru: ${fmt(acc.gudang_baru)}<br>Block baru: ${fmt(acc.block_baru)}<br>
-        Kavling baru: ${fmt(acc.kavling_baru)}<br>Baris stock: ${fmt(acc.baris_stock)}
+        Kavling baru: ${fmt(acc.kavling_baru)}<br>Stock diimpor: 0 box
         ${acc.dilewati?'<br>Dilewati: '+fmt(acc.dilewati):''}</div>
-      <button class="btn" style="margin-top:12px" onclick="go('stock')">Lihat stock</button></div>`;
-    loadHome(); loadStock(); loadLoc();
+      <button class="btn" style="margin-top:12px" onclick="go('loc')">Lihat struktur gudang</button></div>`;
+    loadHome(); loadLoc();
   }catch(e){ b.disabled=false; b.textContent='Coba lagi';
     out.insertAdjacentHTML('afterbegin',`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
 }
-
 // ================= TUGAS PICKING (draft → revisi → eksekusi) =================
 let CUR_TASK=null;
 async function loadTasks(){
