@@ -167,6 +167,54 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   background:#EFEDE8;border-radius:8px;padding:8px 10px;margin-bottom:12px;line-height:1.5}
 @media (min-width:720px){ .kpis{grid-template-columns:repeat(4,1fr)} }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ===== REV4 FIELD VISUAL UX ===== */
+:root{
+  --field-blue:#0F5C63;
+  --field-blue-soft:#E8F2F3;
+  --field-green:#1B7F4B;
+  --field-orange:#9A6300;
+  --field-red:#B3261E;
+}
+.field-banner{
+  background:linear-gradient(135deg,var(--ink),#293039);
+  color:#fff;border-radius:16px;padding:16px;margin-bottom:12px;
+}
+.field-banner .hello{font-size:12px;color:#B8C0C5;margin-bottom:3px}
+.field-banner .rdcname{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.field-banner .rolebadge{display:inline-flex;margin-top:8px;padding:4px 9px;border-radius:20px;
+  background:rgba(255,255,255,.12);font:700 10.5px var(--mono);letter-spacing:.5px}
+.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.quick{
+  border:1px solid var(--line);background:#fff;border-radius:14px;padding:14px 12px;
+  min-height:105px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;
+  box-shadow:0 2px 8px rgba(20,22,26,.045)
+}
+.quick:active{transform:scale(.985)}
+.quick .ico{font-size:28px;line-height:1}
+.quick .qt{font-size:15px;font-weight:750;margin-top:10px}
+.quick .qs{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.quick.primary{background:var(--field-blue-soft);border-color:#C6DEDF}
+.quick.alert{background:var(--warn-bg);border-color:#EBD5A3}
+.action-strip{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none}
+.action-strip::-webkit-scrollbar{display:none}
+.chip-action{flex:0 0 auto;padding:8px 11px;border-radius:20px;border:1px solid var(--line);
+  background:#fff;font-size:11.5px;font-weight:650;cursor:pointer}
+.flowbox{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.flowsteps{display:flex;align-items:center;gap:5px;overflow-x:auto;scrollbar-width:none}
+.flowstep{flex:0 0 auto;text-align:center;min-width:64px}
+.flowstep .dot{width:32px;height:32px;border-radius:9px;background:var(--field-blue-soft);
+ display:grid;place-items:center;margin:0 auto 4px;font-size:15px}
+.flowstep span{font-size:9.5px;font-family:var(--mono);color:var(--muted)}
+.flowarr{color:#AAA;flex:0 0 auto}
+.field-title{font-size:19px;font-weight:800;letter-spacing:-.35px;margin:4px 0}
+.field-sub{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.role-note{border-left:4px solid var(--field-blue);background:var(--field-blue-soft);
+ padding:10px 12px;border-radius:0 10px 10px 0;font-size:12.5px;margin-bottom:12px}
+.denied{background:var(--stop-bg);border:1px solid #EFC4C0;color:var(--stop);
+ padding:12px;border-radius:11px;font-size:12.5px;font-weight:650}
+@media(max-width:380px){.quick-grid{grid-template-columns:1fr}.quick{min-height:90px}}
+
 </style></head><body>
 <div id="loginView" style="min-height:100vh;display:grid;place-items:center;background:var(--ink);padding:24px">
   <div style="width:100%;max-width:340px;background:var(--card);border-radius:16px;padding:26px">
@@ -188,9 +236,49 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 </div>
 
 <section class="screen on" id="s-home"><div class="wrap">
-  <div id="rdcPickWrap" style="display:none;margin-bottom:6px">
+  <div id="rdcPickWrap" style="display:none;margin-bottom:8px">
     <label>RDC</label><select id="rdcPick"></select>
   </div>
+
+  <div class="field-banner">
+    <div class="hello">AREA KERJA AKTIF</div>
+    <div class="rdcname" id="fieldRdc">RDC</div>
+    <div class="rolebadge" id="fieldRole">ROLE</div>
+  </div>
+
+  <div class="eyebrow">Aksi utama</div>
+  <div class="quick-grid">
+    <div class="quick primary" data-perm="PUTAWAY" onclick="safeGo('unloc','PUTAWAY')">
+      <div class="ico">📥</div><div><div class="qt">Terima & Putaway</div><div class="qs">Stock SAP belum lokasi → kavling</div></div>
+    </div>
+    <div class="quick primary" data-perm="PICKING" onclick="safeGo('pick','PICKING')">
+      <div class="ico">📦</div><div><div class="qt">Picking</div><div class="qs">Upload RK → validasi → tugas picking</div></div>
+    </div>
+    <div class="quick" data-perm="STOCK_VIEW" onclick="safeGo('stock','STOCK_VIEW')">
+      <div class="ico">🔎</div><div><div class="qt">Cari Stock</div><div class="qs">Material, seri, lokasi & status</div></div>
+    </div>
+    <div class="quick" data-perm="TRANSFER" onclick="safeGo('transfer','TRANSFER')">
+      <div class="ico">↔️</div><div><div class="qt">Pindah Lokasi</div><div class="qs">Mutasi antar kavling</div></div>
+    </div>
+    <div class="quick alert" data-perm="DAMAGE" onclick="safeGo('rusak','DAMAGE')">
+      <div class="ico">⚠️</div><div><div class="qt">Barang Rusak</div><div class="qs">GOOD → DAMAGED + alasan</div></div>
+    </div>
+    <div class="quick" data-perm="OPNAME" onclick="safeGo('opname','OPNAME')">
+      <div class="ico">✅</div><div><div class="qt">Stock Opname</div><div class="qs">Hitung fisik & variance</div></div>
+    </div>
+  </div>
+
+  <div class="flowbox">
+    <div style="font-weight:750;font-size:12.5px;margin-bottom:9px">Alur kerja gudang</div>
+    <div class="flowsteps">
+      <div class="flowstep"><div class="dot">SAP</div><span>STOCK</span></div><div class="flowarr">›</div>
+      <div class="flowstep"><div class="dot">📥</div><span>PUTAWAY</span></div><div class="flowarr">›</div>
+      <div class="flowstep"><div class="dot">📍</div><span>LOKASI</span></div><div class="flowarr">›</div>
+      <div class="flowstep"><div class="dot">📦</div><span>PICKING</span></div><div class="flowarr">›</div>
+      <div class="flowstep"><div class="dot">✅</div><span>OPNAME</span></div>
+    </div>
+  </div>
+
   <div class="eyebrow">Kondisi hari ini</div>
   <div class="kpis" id="homeKpis"></div>
   <div id="homeZoneAlert"></div>
@@ -199,7 +287,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 </div></section>
 
 <section class="screen" id="s-pick"><div class="wrap">
-  <div class="eyebrow">Picking dari RK Final</div>
+  <div class="field-title">📦 Picking</div><div class="field-sub">Ambil barang sesuai RK Final. Sistem mengecek stock dan lokasi sebelum eksekusi.</div>
   <div class="hint">Upload RK Final → sistem cek ke stock asli → tandai yang salah sebelum barang naik mobil.</div>
   <input type="file" id="rkFile" accept=".ods,.xlsx,.xls" style="display:none">
   <div class="card" style="margin-bottom:10px">
@@ -218,7 +306,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 </div></section>
 
 <section class="screen" id="s-put"><div class="wrap">
-  <div class="eyebrow">Receiving / Putaway</div>
+  <div class="field-title">📥 Receiving / Putaway</div><div class="field-sub">Tempatkan stock SAP yang belum memiliki lokasi ke kavling yang direkomendasikan.</div>
   <div class="hint">Putaway hanya untuk stock SAP yang belum memiliki lokasi. Pilih dari menu Stock Belum Ada Lokasi; sistem tidak membuat stock baru.</div>
   <button class="btn ghost" style="margin-bottom:10px" onclick="go('unloc')">Lihat Stock SAP Belum Ada Lokasi</button>
   <div id="puSizeGate"></div><input type="hidden" id="puMaxQty" value="0">
@@ -238,7 +326,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 </div></section>
 
 <section class="screen" id="s-stock"><div class="wrap">
-  <div class="eyebrow">Cari stock</div>
+  <div class="field-title">🔎 Stock On Hand</div><div class="field-sub">Cari material dan lihat posisi stock secara cepat.</div>
   <div class="row" style="margin-bottom:8px">
     <div><label>Motif / Kode</label><input id="fMotif" placeholder="mis. Ginza"></div>
     <div style="max-width:120px"><label>Seri</label><input id="fSeri" placeholder="S12S"></div>
@@ -262,7 +350,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 </div></section>
 
 <section class="screen" id="s-loc"><div class="wrap">
-  <div class="eyebrow">Struktur gudang</div>
+  <div class="field-title">📍 Master Lokasi</div><div class="field-sub">Kelola hierarchy Gudang → Block → Line → Kavling.</div>
   <div class="hint">Kode lokasi dibuat otomatis. Kavling berisi stock tidak bisa dinonaktifkan.</div>
   <div id="locOut"></div>
   <div class="card" style="margin-top:10px">
@@ -286,7 +374,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 
 
 <section class="screen" id="s-opname"><div class="wrap">
-  <div class="eyebrow">Opname harian</div>
+  <div class="field-title">✅ Stock Opname</div><div class="field-sub">Hitung fisik stock yang bergerak dan catat selisihnya.</div>
   <div class="hint">Menampilkan barang yang bergerak beberapa hari terakhir. Hitung fisiknya, isi jumlahnya, sisanya dihitung sistem.</div>
   <div class="row" style="margin-bottom:12px">
     <div><label>Rentang gerak</label><select id="opDays"><option value="1">Hari ini</option><option value="3" selected>3 hari</option><option value="7">7 hari</option></select></div>
@@ -297,7 +385,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 </div></section>
 
 <section class="screen" id="s-rusak"><div class="wrap">
-  <div class="eyebrow">Catat barang rusak</div>
+  <div class="field-title">⚠️ Barang Rusak</div><div class="field-sub">Pindahkan stock GOOD menjadi DAMAGED dengan alasan yang jelas.</div>
   <div class="hint">Barang dipindah dari kavling asal ke kavling tujuan, statusnya berubah jadi RUSAK.</div>
   <div class="card">
     <div class="row" style="margin-bottom:10px">
@@ -380,7 +468,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 
 
 <section class="screen" id="s-transfer"><div class="wrap">
-  <div class="eyebrow">Pindah lokasi barang</div>
+  <div class="field-title">↔️ Pindah Lokasi</div><div class="field-sub">Relokasi stock antar kavling tanpa mengubah total inventory.</div>
   <div class="hint">Cari barangnya dulu, pilih kavling asal, lalu tentukan kavling tujuan. Sistem cek stock &amp; kapasitas.</div>
   <div class="card">
     <div class="row" style="margin-bottom:10px">
@@ -515,9 +603,24 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div id="opArOut"></div>
 </div></section>
 
+
+<section class="screen" id="s-access"><div class="wrap">
+  <div class="field-title">🔐 Akses & Kewenangan</div>
+  <div class="field-sub">Lihat tier akun aktif dan batas tindakan di WMS.</div>
+  <div class="card" id="accessCard"></div>
+  <div class="eyebrow">Prinsip approval</div>
+  <div class="card">
+    <div class="lrow"><div class="g"><div class="t">Pelaksana</div><div class="s">Eksekusi transaksi harian; tidak mengubah master/approval.</div></div></div>
+    <div class="lrow"><div class="g"><div class="t">Supervisor</div><div class="s">Operasional + approval Stock Opname level SPV.</div></div></div>
+    <div class="lrow"><div class="g"><div class="t">RDC Manager</div><div class="s">Kelola master lokasi/zona RDC + approval RDC.</div></div></div>
+    <div class="lrow"><div class="g"><div class="t">MASTER</div><div class="s">Lintas RDC, konfigurasi pusat, dan approval tindakan sensitif/hapus.</div></div></div>
+  </div>
+</div></section>
+
 <section class="screen" id="s-more"><div class="wrap">
   <div class="eyebrow">Menu lainnya</div>
   <div class="card" style="padding:4px 14px">
+    <div class="lrow" style="cursor:pointer" onclick="go('access')"><div class="g"><div class="t">🔐 Akses Saya</div><div class="s">Role, kewenangan & batas approval</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('sap')"><div class="g"><div class="t">Upload Stock SAP</div><div class="s">Sumber semua stock awal</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('oparsip')"><div class="g"><div class="t">Arsip Opname</div><div class="s">Riwayat + Excel/PDF</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('occ')"><div class="g"><div class="t">Occupancy</div><div class="s">Per ukuran &amp; per gudang</div></div><div class="n muted">›</div></div>
@@ -552,6 +655,86 @@ const SB='https://mfdckngkvjnemwgmkiiv.supabase.co';
 const ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1mZGNrbmdrdmpuZW13Z21raWl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMDcxMjUsImV4cCI6MjEwMTU4MzEyNX0.mFhv9hgQvjzg6AYfmEI2GiJ71I2xSkOozC43mwFcogU';
 let TOKEN=null, ROLE=null, SCOPE=null, RDC=null, PICK_LINES=null;
 
+let EFFECTIVE_ROLE='operator';
+
+/*
+  Role tier Rev4:
+  master       = seluruh RDC + seluruh konfigurasi + approval sensitif
+  rdc_manager  = seluruh operasional RDC + master lokasi/zona + approval RDC
+  supervisor   = operasional RDC + approval opname level SPV
+  operator     = pelaksana transaksi harian, tanpa approval/master configuration
+  viewer       = read only
+  Legacy role non-master tetap dipetakan aman agar akun existing tidak langsung gagal login.
+*/
+const ROLE_LABELS={
+  master:'MASTER',
+  rdc_manager:'RDC MANAGER',
+  supervisor:'SUPERVISOR',
+  operator:'PELAKSANA',
+  viewer:'VIEWER'
+};
+const ROLE_PERMS={
+  master:['*'],
+  rdc_manager:['STOCK_VIEW','PUTAWAY','PICKING','TRANSFER','DAMAGE','OPNAME','LOCATION_MANAGE','ZONE_MANAGE','SAP_UPLOAD','RECON','RDC_APPROVE'],
+  supervisor:['STOCK_VIEW','PUTAWAY','PICKING','TRANSFER','DAMAGE','OPNAME','SPV_APPROVE'],
+  operator:['STOCK_VIEW','PUTAWAY','PICKING','TRANSFER','DAMAGE','OPNAME'],
+  viewer:['STOCK_VIEW']
+};
+function normalizeRole(r){
+  const x=String(r||'').toLowerCase().trim();
+  if(x==='master'||x==='super_admin'||x==='admin') return 'master';
+  if(['rdc_manager','manager','head_rdc','head','rdc-head'].includes(x)) return 'rdc_manager';
+  if(['supervisor','spv','warehouse_supervisor'].includes(x)) return 'supervisor';
+  if(['operator','pelaksana','staff','warehouse_staff'].includes(x)) return 'operator';
+  if(['viewer','read_only','readonly'].includes(x)) return 'viewer';
+
+  // Compatibility akun lama:
+  // akun non-master lama sebelumnya memiliki akses operasional + approval SPV.
+  // Dipetakan sebagai supervisor agar fungsi existing tidak tiba-tiba hilang.
+  return x ? 'supervisor' : 'operator';
+}
+function hasPerm(p){
+  const a=ROLE_PERMS[EFFECTIVE_ROLE]||[];
+  return a.includes('*')||a.includes(p);
+}
+function safeGo(screen,perm){
+  if(perm&&!hasPerm(perm)){
+    alert('Akses ditolak. Fitur ini tidak termasuk kewenangan '+(ROLE_LABELS[EFFECTIVE_ROLE]||EFFECTIVE_ROLE)+'.');
+    return;
+  }
+  go(screen);
+}
+function applyRoleUI(){
+  document.getElementById('whoRole').textContent=ROLE_LABELS[EFFECTIVE_ROLE]||EFFECTIVE_ROLE.toUpperCase();
+  const fr=document.getElementById('fieldRole'); if(fr) fr.textContent=ROLE_LABELS[EFFECTIVE_ROLE]||EFFECTIVE_ROLE;
+  const fd=document.getElementById('fieldRdc'); if(fd) fd.textContent=RDC||'SEMUA RDC';
+  document.querySelectorAll('[data-perm]').forEach(el=>{
+    const p=el.dataset.perm;
+    el.style.display=hasPerm(p)?'':'none';
+  });
+
+  // Master/config screens hidden from unauthorized roles.
+  const menuMap={
+    pick:'PICKING', put:'PUTAWAY', stock:'STOCK_VIEW', opname:'OPNAME',
+    transfer:'TRANSFER', rusak:'DAMAGE',
+    loc:'LOCATION_MANAGE', kap:'ZONE_MANAGE', mmotif:'ZONE_MANAGE',
+    mpallet:'ZONE_MANAGE', zone:'ZONE_MANAGE', sap:'SAP_UPLOAD', recon:'RECON'
+  };
+  Object.entries(menuMap).forEach(([s,p])=>{
+    const section=document.getElementById('s-'+s);
+    if(section) section.dataset.requiredPerm=p;
+
+    // Sembunyikan menu lanjutan dari role yang tidak berhak agar UI lapangan tidak penuh.
+    document.querySelectorAll(`#s-more .lrow[onclick*="go('${s}')"]`).forEach(row=>{
+      row.style.display=hasPerm(p)?'':'none';
+    });
+    document.querySelectorAll(`.nav button[data-s="${s}"]`).forEach(btn=>{
+      btn.style.display=hasPerm(p)?'':'none';
+    });
+  });
+}
+
+
 const hdr=()=>({'apikey':ANON,'Authorization':'Bearer '+(TOKEN||ANON),'Content-Type':'application/json'});
 async function rpc(fn,params){
   const r=await fetch(`${SB}/rest/v1/rpc/${fn}`,{method:'POST',headers:hdr(),body:JSON.stringify(params||{})});
@@ -571,7 +754,7 @@ async function doLogin(){
   try{
     const acct=await rpc('verify_password',{input_password:pw});
     if(!acct){msg.textContent='Password salah.';msg.style.color='var(--stop)';return;}
-    ROLE=acct.role; SCOPE=acct.rdc_name;
+    ROLE=acct.role; EFFECTIVE_ROLE=normalizeRole(ROLE); SCOPE=acct.rdc_name;
     const email=await rpc('get_login_email',{input_password:pw});
     const r=await fetch(`${SB}/auth/v1/token?grant_type=password`,{method:'POST',
       headers:{'apikey':ANON,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
@@ -579,7 +762,7 @@ async function doLogin(){
     TOKEN=(await r.json()).access_token;
     document.getElementById('loginView').style.display='none';
     document.getElementById('appView').style.display='block';
-    document.getElementById('whoRole').textContent = ROLE==='master'?'MASTER':'RDC User';
+    document.getElementById('whoRole').textContent = ROLE_LABELS[EFFECTIVE_ROLE]||EFFECTIVE_ROLE.toUpperCase();
     await setupRdc();
   }catch(e){msg.textContent='Gagal: '+e.message;msg.style.color='var(--stop)';}
 }
@@ -592,14 +775,20 @@ async function setupRdc(){
     sel.innerHTML=rows.map(r=>`<option>${esc(r.name)}</option>`).join('');
     document.getElementById('rdcPickWrap').style.display='block';
     RDC=rows[0]?.name;
-    sel.onchange=()=>{RDC=sel.value; loadHome(); loadStock(); loadLoc();};
+    sel.onchange=()=>{RDC=sel.value; loadHome(); loadStock(); loadLoc(); applyRoleUI();};
   }
-  await loadHome(); loadStock(); loadLoc();
+  await loadHome(); loadStock(); loadLoc(); applyRoleUI();
 }
 
 // ---------- screens ----------
 const SUB={home:'RDC · HARI INI',pick:'RK FINAL · PICKING',put:'BARANG MASUK',stock:'STOCK ON HAND',loc:'MASTER LOKASI',zone:'ZONASI UKURAN'};
 function go(s){
+  const target=document.getElementById('s-'+s);
+  const required=target?.dataset?.requiredPerm;
+  if(required&&!hasPerm(required)){
+    alert('Akses ditolak. Menu ini membutuhkan kewenangan yang lebih tinggi.');
+    return;
+  }
   document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('on',e.id==='s-'+s));
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
   document.getElementById('hdrSub').textContent=(RDC?RDC.toUpperCase()+' · ':'')+(SUB[s]||'');
@@ -884,8 +1073,8 @@ async function loadOpPending(){
         <div class="tk-qty"><b>${Number(r.selisih)>0?'+':''}${fmt(r.selisih)}</b><span>SELISIH</span></div></div>
         <div class="tk-strip"><div class="muted" style="font-size:12.5px">Sistem ${fmt(r.qty_system)} · Fisik ${fmt(r.qty_physical)}</div>
         <div class="muted" style="font-size:12px;margin-top:6px">Tahap: <b>${esc(r.tahap||'')}</b>${r.spv_by?' · Spv: '+esc(r.spv_by):''}</div>
-        ${((ROLE==='master'&&r.spv_status)||(ROLE!=='master'&&!r.spv_status))?`<div class="row" style="margin-top:10px">
-          <button class="btn" style="padding:10px" onclick="opDecide(${r.id},true)">${ROLE==='master'?'Setujui (Manager)':'Setujui (Spv)'}</button>
+        ${((EFFECTIVE_ROLE==='master'&&r.spv_status)||(EFFECTIVE_ROLE==='supervisor'&&!r.spv_status))?`<div class="row" style="margin-top:10px">
+          <button class="btn" style="padding:10px" onclick="opDecide(${r.id},true)">${EFFECTIVE_ROLE==='master'?'Setujui (Manager)':'Setujui (Spv)'}</button>
           <button class="btn ghost" style="padding:10px" onclick="opDecide(${r.id},false)">Tolak</button></div>`
           :`<div class="muted" style="margin-top:8px;font-size:12.5px">${r.spv_status?'Menunggu persetujuan Manager.':'Menunggu persetujuan Spv.'}</div>`}
         </div></div>`;}).join('');
@@ -946,7 +1135,7 @@ async function loadArsip(){
           ${r.exported?'<span class="pill p-ok">SUDAH DIUNDUH</span>':'<span class="pill p-warn">BELUM</span>'}
         </div>
         <button class="btn ghost" style="margin-bottom:8px" onclick="arDownload('${esc(r.period)}')">⬇ Unduh Excel</button>
-        ${r.exported && r.purgeable && ROLE==='master'
+        ${r.exported && r.purgeable && EFFECTIVE_ROLE==='master'
           ? `<button class="btn" style="background:var(--stop)" onclick="arPurge('${esc(r.period)}')">Hapus dari database</button>`
           : `<div class="muted" style="font-size:12px">${!r.exported?'Unduh dulu sebelum bisa dihapus.':(!r.purgeable?'Belum boleh dihapus — data kurang dari 2 bulan.':'Penghapusan hanya dapat dilakukan setelah approval MASTER.')}</div>`}
       </div>`).join('');
@@ -964,7 +1153,7 @@ async function arDownload(period){
   }catch(e){ alert('Gagal: '+e.message); }
 }
 async function arPurge(period){
-  if(ROLE!=='master'){ alert('Penghapusan arsip memerlukan approval MASTER.'); return; }
+  if(EFFECTIVE_ROLE!=='master'){ alert('Penghapusan arsip memerlukan approval MASTER.'); return; }
   const reason=prompt(`APPROVAL MASTER — Hapus transaksi ${period}
 
 Masukkan alasan penghapusan:`,'');
@@ -1535,7 +1724,7 @@ async function loadSync(){
             Sudah di kavling: <b>${fmt(r.sudah_di_kavling)}</b> box<br>
             Belum ada lokasi sekarang: <b>${fmt(r.sekarang)}</b> box<br>
             Usulan jadi: <b>${fmt(r.usulan)}</b> box</div>
-          ${p && ROLE==='master' ? `<div class="row" style="margin-top:10px">
+          ${p && EFFECTIVE_ROLE==='master' ? `<div class="row" style="margin-top:10px">
             <button class="btn" style="padding:10px" onclick="syDecide(${r.id},true)">Setujui</button>
             <button class="btn ghost" style="padding:10px" onclick="syDecide(${r.id},false)">Tolak</button></div>`
             : p ? `<div class="muted" style="margin-top:8px;font-size:12.5px">Menunggu RDC Manager.</div>`
@@ -1581,7 +1770,7 @@ async function loadStock(){
     out.innerHTML = ST_ROWS.length
       ? `<div class="card" style="padding:4px 14px">`+ST_ROWS.map(r=>`
         <div class="lrow">
-          ${ROLE==='master'?`<input type="checkbox" class="stChk" value="${r.id}" style="width:18px;height:18px;flex:0 0 auto">`:''}
+          ${EFFECTIVE_ROLE==='master'?`<input type="checkbox" class="stChk" value="${r.id}" style="width:18px;height:18px;flex:0 0 auto">`:''}
           <div class="g"><div class="t">${esc(r.motif||r.material_code)}</div>
           <div class="s">${esc(r.material_code)}${r.batch?' · Seri '+esc(r.batch):''}</div>
           <div class="s">${r.gudang?esc(r.gudang)+' · '+esc(r.block)+' · '+esc(r.kavling):esc(r.location_code)}</div></div>
@@ -1599,7 +1788,7 @@ async function loadStock(){
 function stPage(d){ ST_PAGE+=d; loadStock(); window.scrollTo({top:0}); }
 function renderStAdmin(){
   const el=document.getElementById('stAdmin');
-  if(ROLE!=='master'){ el.innerHTML=''; return; }
+  if(EFFECTIVE_ROLE!=='master'){ el.innerHTML=''; return; }
   el.innerHTML=`<div class="card" style="border-color:#EFC4C0">
     <div style="font-weight:650;font-size:13.5px;color:var(--stop);margin-bottom:6px">Hapus stock (khusus masa trial)</div>
     <div class="muted" style="font-size:12px;margin-bottom:10px">Penghapusan hanya untuk kondisi khusus dan memerlukan approval MASTER + alasan + konfirmasi berlapis. Gunakan dengan sangat hati-hati.</div>
@@ -1609,7 +1798,7 @@ function renderStAdmin(){
 }
 async function stDelete(all){
   const msg=document.getElementById('stDelMsg');
-  if(ROLE!=='master'){msg.style.color='var(--stop)';msg.textContent='Penghapusan stock memerlukan approval MASTER.';return;}
+  if(EFFECTIVE_ROLE!=='master'){msg.style.color='var(--stop)';msg.textContent='Penghapusan stock memerlukan approval MASTER.';return;}
   let ids=[];
   if(!all){
     document.querySelectorAll('.stChk:checked').forEach(c=>ids.push(c.value));
@@ -2166,7 +2355,55 @@ document.getElementById('opArPdf').addEventListener('click',()=>{
     th{background:#14161A;color:#fff;text-align:left;font-size:10px}
     .r{text-align:right} small{color:#666}
     @media print{@page{size:landscape;margin:10mm}}
-  </style></head><body>
+  
+/* ===== REV4 FIELD VISUAL UX ===== */
+:root{
+  --field-blue:#0F5C63;
+  --field-blue-soft:#E8F2F3;
+  --field-green:#1B7F4B;
+  --field-orange:#9A6300;
+  --field-red:#B3261E;
+}
+.field-banner{
+  background:linear-gradient(135deg,var(--ink),#293039);
+  color:#fff;border-radius:16px;padding:16px;margin-bottom:12px;
+}
+.field-banner .hello{font-size:12px;color:#B8C0C5;margin-bottom:3px}
+.field-banner .rdcname{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.field-banner .rolebadge{display:inline-flex;margin-top:8px;padding:4px 9px;border-radius:20px;
+  background:rgba(255,255,255,.12);font:700 10.5px var(--mono);letter-spacing:.5px}
+.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.quick{
+  border:1px solid var(--line);background:#fff;border-radius:14px;padding:14px 12px;
+  min-height:105px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;
+  box-shadow:0 2px 8px rgba(20,22,26,.045)
+}
+.quick:active{transform:scale(.985)}
+.quick .ico{font-size:28px;line-height:1}
+.quick .qt{font-size:15px;font-weight:750;margin-top:10px}
+.quick .qs{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.quick.primary{background:var(--field-blue-soft);border-color:#C6DEDF}
+.quick.alert{background:var(--warn-bg);border-color:#EBD5A3}
+.action-strip{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none}
+.action-strip::-webkit-scrollbar{display:none}
+.chip-action{flex:0 0 auto;padding:8px 11px;border-radius:20px;border:1px solid var(--line);
+  background:#fff;font-size:11.5px;font-weight:650;cursor:pointer}
+.flowbox{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.flowsteps{display:flex;align-items:center;gap:5px;overflow-x:auto;scrollbar-width:none}
+.flowstep{flex:0 0 auto;text-align:center;min-width:64px}
+.flowstep .dot{width:32px;height:32px;border-radius:9px;background:var(--field-blue-soft);
+ display:grid;place-items:center;margin:0 auto 4px;font-size:15px}
+.flowstep span{font-size:9.5px;font-family:var(--mono);color:var(--muted)}
+.flowarr{color:#AAA;flex:0 0 auto}
+.field-title{font-size:19px;font-weight:800;letter-spacing:-.35px;margin:4px 0}
+.field-sub{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.role-note{border-left:4px solid var(--field-blue);background:var(--field-blue-soft);
+ padding:10px 12px;border-radius:0 10px 10px 0;font-size:12.5px;margin-bottom:12px}
+.denied{background:var(--stop-bg);border:1px solid #EFC4C0;color:var(--stop);
+ padding:12px;border-radius:11px;font-size:12.5px;font-weight:650}
+@media(max-width:380px){.quick-grid{grid-template-columns:1fr}.quick{min-height:90px}}
+
+</style></head><body>
     <h2>Arsip Stock Opname — RDC ${esc(RDC)}</h2>
     <div class="sub">Dicetak ${new Date().toLocaleString('id-ID')} · ${OP_HIST.length} catatan</div>
     <table><thead><tr><th>Tanggal</th><th>Lokasi</th><th>Motif</th><th>Seri</th>
@@ -2211,5 +2448,27 @@ async function puManualSave(mat,batch){
 ['tfGud','tfBlk','tfKav'].forEach(id=>{const el=document.getElementById(id);
   if(el){el.style.textTransform='uppercase';
     el.addEventListener('input',()=>{const p=el.selectionStart;el.value=el.value.toUpperCase();try{el.setSelectionRange(p,p);}catch(e){}});}});
+
+
+
+function renderAccess(){
+  const el=document.getElementById('accessCard'); if(!el) return;
+  const perms=ROLE_PERMS[EFFECTIVE_ROLE]||[];
+  const all=perms.includes('*');
+  const names={
+    STOCK_VIEW:'Lihat Stock',PUTAWAY:'Receiving / Putaway',PICKING:'Picking',
+    TRANSFER:'Pindah Lokasi',DAMAGE:'Barang Rusak',OPNAME:'Stock Opname',
+    LOCATION_MANAGE:'Kelola Lokasi',ZONE_MANAGE:'Kelola Zonasi/Master',
+    SAP_UPLOAD:'Upload Stock SAP',RECON:'Reconciliation SAP-WMS',
+    SPV_APPROVE:'Approval SPV',RDC_APPROVE:'Approval RDC'
+  };
+  const allowed=all?['Semua kewenangan sistem']:perms.map(p=>names[p]||p);
+  el.innerHTML=`<div style="font-size:11px;color:var(--muted);font-family:var(--mono)">AKUN AKTIF</div>
+    <div style="font-size:20px;font-weight:800;margin:3px 0">${esc(ROLE_LABELS[EFFECTIVE_ROLE]||EFFECTIVE_ROLE)}</div>
+    <div class="muted" style="font-size:12.5px;margin-bottom:10px">${esc(RDC||'All RDC')}</div>
+    ${allowed.map(x=>`<span class="pill p-ok" style="margin:3px 3px 0 0">${esc(x)}</span>`).join('')}`;
+}
+const _goAccess=go;
+go=function(s){ _goAccess(s); if(s==='access') renderAccess(); };
 
 </script></body></html>
