@@ -967,12 +967,66 @@ function parseReceivingWorkbook(wb){
   const find=(H,a)=>{for(const x of a){const i=H.indexOf(x);if(i>=0)return i;}return -1;};
   for(const sn of wb.SheetNames){const g=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null,raw:true});if(!g.length)continue;let hr=-1,H=[];for(let i=0;i<Math.min(15,g.length);i++){H=(g[i]||[]).map(norm);if(find(H,aliases.material)>=0&&find(H,aliases.qty)>=0){hr=i;break;}}if(hr<0)continue;const cm=find(H,aliases.material),cd=find(H,aliases.desc),cb=find(H,aliases.batch),cq=find(H,aliases.qty),cs=find(H,aliases.sloc);const out=[];for(let i=hr+1;i<g.length;i++){const r=g[i]||[],m=String(r[cm]||'').trim();if(!m)continue;const q=Number(r[cq])||0;if(q<=0)continue;out.push({material:m.toUpperCase(),desc:cd>=0?String(r[cd]||''):'',batch:cb>=0?String(r[cb]||'').trim():'',qty:q,sloc:cs>=0?String(r[cs]||'').trim():''});}if(out.length)return out;}return [];
 }
-function readReceivingFile(file){
-  const out=document.getElementById('puRecvOut');out.innerHTML='<div class="muted">⏳ Membaca file penerimaan…</div>';const fr=new FileReader();fr.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:'binary'}),rows=parseReceivingWorkbook(wb);if(!rows.length){out.innerHTML='<div class="denied">File tidak dikenali. Minimal harus ada kolom Material dan Qty.</div>';return;}PU_RECV_ROWS={filename:file.name,rows};const qty=rows.reduce((a,r)=>a+Number(r.qty||0),0),mats=new Set(rows.map(r=>r.material));out.innerHTML=`<div style="font-weight:700">${esc(file.name)}</div><div class="muted" style="font-size:12px;margin:4px 0 9px">${fmt(rows.length)} baris · ${fmt(mats.size)} material · ${fmt(qty)} box</div><button class="btn brand" id="puRecvImport">Import sebagai Penerimaan SAP</button>`;document.getElementById('puRecvImport').onclick=importReceiving;}catch(e){out.innerHTML=`<div class="denied">Gagal membaca: ${esc(e.message)}</div>`;}};fr.readAsBinaryString(file);
+async function readReceivingFile(file){
+  const out=document.getElementById('puRecvOut');
+  out.innerHTML='<div class="muted">⏳ Membaca & memvalidasi file penerimaan…</div>';
+  const fr=new FileReader();
+  fr.onload=async ev=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'}),rows=parseReceivingWorkbook(wb);
+      if(!rows.length){out.innerHTML='<div class="denied">File tidak dikenali. Minimal harus ada kolom Material dan Qty.</div>';return;}
+      await refreshZoneCache().catch(()=>{});
+      const qty=rows.reduce((a,r)=>a+Number(r.qty||0),0);
+      const mats=[...new Set(rows.map(r=>String(r.material||'').trim().toUpperCase()).filter(Boolean))];
+      const classified=mats.filter(m=>!!getMaterialSizeCategory(m));
+      const unclassified=mats.filter(m=>!getMaterialSizeCategory(m));
+      const invalid=rows.filter(r=>!r.material||!Number.isFinite(Number(r.qty))||Number(r.qty)<=0);
+      PU_RECV_ROWS={filename:file.name,rows};
+      out.innerHTML=`<div class="card" style="margin:0;border-color:#C6DEDF">
+        <div style="font-weight:800;font-size:14px">PREVIEW PENERIMAAN SAP</div>
+        <div class="muted" style="font-size:12px;margin:3px 0 10px">${esc(file.name)}</div>
+        <div class="kpis" style="grid-template-columns:1fr 1fr">
+          <div class="kpi"><div class="lbl">Baris</div><div class="val">${fmt(rows.length)}</div></div>
+          <div class="kpi"><div class="lbl">Qty</div><div class="val">${fmt(qty)}<small> box</small></div></div>
+          <div class="kpi"><div class="lbl">Material</div><div class="val">${fmt(mats.length)}</div></div>
+          <div class="kpi ${unclassified.length?'alert':''}"><div class="lbl">Ukuran belum klasifikasi</div><div class="val">${fmt(unclassified.length)}</div></div>
+        </div>
+        <div style="font-size:12.5px;margin-top:10px">
+          <span class="pill p-ok">${fmt(classified.length)} TERKLASIFIKASI</span>
+          ${unclassified.length?` <span class="pill p-warn">${fmt(unclassified.length)} PERLU KLASIFIKASI</span>`:''}
+          ${invalid.length?` <span class="pill p-stop">${fmt(invalid.length)} ERROR</span>`:''}
+        </div>
+        ${unclassified.length?`<div class="hint" style="margin-top:10px">Penerimaan <b>tetap boleh dilanjutkan</b>. ${fmt(unclassified.length)} material akan masuk ke <b>Belum Ada Lokasi</b> dan Putaway ditahan sampai kategori ukuran ditentukan.</div>`:''}
+        ${invalid.length?`<div class="denied" style="margin-top:10px">Ada ${fmt(invalid.length)} baris tidak valid. Perbaiki Material/Qty sebelum penerimaan dikonfirmasi.</div>`:''}
+        <button class="btn brand" id="puRecvImport" style="margin-top:10px" ${invalid.length?'disabled':''}>✓ Konfirmasi Penerimaan</button>
+        <button class="btn ghost" id="puRecvCancel" style="margin-top:8px">Ganti / Batalkan File</button>
+      </div>`;
+      document.getElementById('puRecvImport').onclick=importReceiving;
+      document.getElementById('puRecvCancel').onclick=()=>{PU_RECV_ROWS=null;out.innerHTML='';};
+    }catch(e){out.innerHTML=`<div class="denied">Gagal membaca: ${esc(e.message)}</div>`;}
+  };
+  fr.readAsBinaryString(file);
 }
 async function importReceiving(){
-  const out=document.getElementById('puRecvOut'),ref=document.getElementById('puRecvRef').value.trim(),date=document.getElementById('puRecvDate').value;if(!PU_RECV_ROWS)return;if(!ref){out.insertAdjacentHTML('afterbegin','<div class="denied" style="margin-bottom:8px">No. Dokumen SAP / referensi wajib diisi untuk mencegah double import.</div>');return;}const b=document.getElementById('puRecvImport');b.disabled=true;b.textContent='⏳ Mengimpor…';
-  try{const r=await rpc('wms_receiving_import',{p_rdc:RDC,p_reference:ref,p_filename:PU_RECV_ROWS.filename,p_date:date,p_rows:PU_RECV_ROWS.rows});out.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg);margin:0"><div style="font-size:22px">✅</div><div style="font-weight:750;color:var(--ok)">${fmt(r.qty)} box penerimaan SAP berhasil masuk.</div><div class="muted" style="font-size:12px;margin-top:5px">Stock sekarang berada di Belum Ada Lokasi. Material baru wajib diklasifikasikan ukuran sebelum Putaway.</div><button class="btn ghost" style="margin-top:9px" onclick="go('unloc')">Lihat Stock Belum Ada Lokasi</button></div>`;PU_RECV_ROWS=null;document.getElementById('puRecvRef').value='';await refreshZoneCache().catch(()=>{});loadHome();}catch(e){b.disabled=false;b.textContent='Import sebagai Penerimaan SAP';out.insertAdjacentHTML('afterbegin',`<div class="denied" style="margin-bottom:8px">Gagal: ${esc(e.message)}</div>`);}
+  const out=document.getElementById('puRecvOut'),ref=document.getElementById('puRecvRef').value.trim(),date=document.getElementById('puRecvDate').value;if(!PU_RECV_ROWS)return;if(!ref){out.insertAdjacentHTML('afterbegin','<div class="denied" style="margin-bottom:8px">No. Dokumen SAP / referensi wajib diisi untuk mencegah double import.</div>');return;}const b=document.getElementById('puRecvImport');b.disabled=true;b.textContent='⏳ Mencatat penerimaan…';
+  try{const r=await rpc('wms_receiving_import',{p_rdc:RDC,p_reference:ref,p_filename:PU_RECV_ROWS.filename,p_date:date,p_rows:PU_RECV_ROWS.rows});out.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg);margin:0"><div style="font-size:22px">✅</div><div style="font-weight:750;color:var(--ok)">${fmt(r.qty)} box penerimaan SAP berhasil masuk.</div><div class="muted" style="font-size:12px;margin-top:5px">Stock sekarang berada di Belum Ada Lokasi. Material yang ukuran belum diklasifikasikan tetap tercatat sebagai Belum Ada Lokasi dan harus diklasifikasikan sebelum Putaway.</div><button class="btn ghost" style="margin-top:9px" onclick="go('unloc')">Lihat Stock Belum Ada Lokasi</button></div>`;PU_RECV_ROWS=null;document.getElementById('puRecvRef').value='';await refreshZoneCache().catch(()=>{});loadHome();}catch(e){b.disabled=false;b.textContent='✓ Konfirmasi Penerimaan';out.insertAdjacentHTML('afterbegin',`<div class="denied" style="margin-bottom:8px">Gagal: ${esc(e.message)}</div>`);}
+}
+
+async function quickAssignPutawaySize(mat,btn){
+  const sel=document.getElementById('puQuickSize'),size=normSize(sel?.value);
+  const msg=document.getElementById('puMsg');
+  if(!size){msg.style.color='var(--stop)';msg.textContent='Pilih kategori ukuran.';return;}
+  btn.disabled=true;btn.textContent='⏳ Menyimpan…';
+  try{
+    await rpc('wms_material_size_save',{p_rdc:RDC,p_materials:[String(mat).toUpperCase()],p_ukuran:size});
+    await refreshZoneCache();
+    msg.style.color='var(--ok)';msg.textContent=`✓ ${mat} diklasifikasikan sebagai ${size}. Mencari lokasi…`;
+    document.getElementById('puSizeGate').innerHTML='';
+    setTimeout(()=>document.getElementById('puFind').click(),150);
+  }catch(e){
+    btn.disabled=false;btn.textContent='Simpan & Lanjut Putaway';
+    msg.style.color='var(--stop)';msg.textContent='Gagal menyimpan kategori: '+e.message;
+  }
 }
 
 // ---------- putaway ----------
@@ -990,8 +1044,18 @@ document.getElementById('puFind').addEventListener('click',async()=>{
     const sizeCat=getMaterialSizeCategory(mat);
     const gate=document.getElementById('puSizeGate');
     if(!sizeCat){
-      gate.innerHTML=`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg)"><div style="font-weight:650;color:var(--warn)">Material ${esc(mat)} belum memiliki kategori ukuran</div><div class="muted" style="font-size:12.5px;margin-top:4px">Tetapkan kategori di menu Zonasi Ukuran sebelum material dapat diarahkan ke lokasi.</div><button class="btn ghost" style="margin-top:9px" onclick="go('zone');setTimeout(()=>{document.getElementById('zmSearch').value='${esc(mat)}';renderZoneMaterials();},100)">Atur kategori ukuran</button></div>`;
-      msg.style.color='var(--warn)'; msg.textContent='Putaway ditahan: kategori ukuran belum ditentukan.'; return;
+      const sizes=zoneSizes();
+      gate.innerHTML=`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg)">
+        <div style="font-weight:750;color:var(--warn)">⚠ UKURAN BELUM DIKLASIFIKASIKAN</div>
+        <div style="font-weight:650;margin-top:3px">${esc(mat)}</div>
+        <div class="muted" style="font-size:12.5px;margin-top:4px">Pilih kategori ukuran tanpa meninggalkan proses Putaway.</div>
+        ${sizes.length?`<label style="margin-top:10px">Kategori ukuran</label>
+          <select id="puQuickSize">${sizes.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('')}</select>
+          <button class="btn brand" style="margin-top:9px" onclick="quickAssignPutawaySize('${esc(mat)}',this)">Simpan & Lanjut Putaway</button>`
+          :`<div class="denied" style="margin-top:10px">Belum ada kategori/zona ukuran. RDC Manager harus membuat Zonasi Ukuran terlebih dahulu.</div>
+          <button class="btn ghost" style="margin-top:9px" onclick="go('zone')">Buka Zonasi Ukuran</button>`}
+      </div>`;
+      msg.style.color='var(--warn)'; msg.textContent='Putaway ditahan hanya sampai kategori ukuran ditentukan.'; return;
     }
     gate.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg);padding:10px 14px"><span class="pill p-ok">UKURAN ${esc(sizeCat)}</span> <span class="muted" style="font-size:12px">Rekomendasi lokasi akan mengikuti zonasi ukuran yang tersedia.</span></div>`;
     const res=await rpc('wms_suggest_putaway',{p_rdc:RDC,p_material:mat,p_qty:qty,p_batch:batch});
@@ -1284,7 +1348,7 @@ function readSAP(file){
       }catch(e){}
       document.getElementById('sapRecon').onclick=runRecon;
       document.getElementById('sapConfirm').onclick=async()=>{
-        const b=document.getElementById('sapConfirm'); b.disabled=true; b.textContent='⏳ Mengimpor…';
+        const b=document.getElementById('sapConfirm'); b.disabled=true; b.textContent='⏳ Mencatat penerimaan…';
         try{
           const r=await rpc('wms_sap_import',{p_upload_id:SAP_UPLOAD_ID});
           out.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
@@ -1352,7 +1416,7 @@ async function loadUnloc(){
         <div class="lrow" style="cursor:pointer" onclick="prefillPutaway('${esc(r.material_code)}','${esc(r.batch)}',${r.qty})">
         <div class="g"><div class="t">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
         <div class="s">${esc(r['desc']||'')}</div>
-        ${!getMaterialSizeCategory(r.material_code)?'<div style="font-size:11px;color:var(--warn);margin-top:3px">⚠ MATERIAL BARU — kategori ukuran wajib ditentukan sebelum Putaway</div>':''}</div>
+        ${!getMaterialSizeCategory(r.material_code)?'<div style="font-size:11px;color:var(--warn);margin-top:3px">⚠ UKURAN BELUM DIKLASIFIKASIKAN — tentukan kategori sebelum Putaway</div>':''}</div>
         <div style="text-align:right"><div class="n">${fmt(r.qty)}</div>
         ${r.status==='DAMAGED'?'<span class="pill p-stop">RUSAK</span>':'<span class="pill p-warn">PERLU LOKASI</span>'}</div></div>`).join('')+`</div>`
       : `<div class="card muted">Semua stock sudah punya lokasi.</div>`;
