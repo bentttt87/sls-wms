@@ -220,9 +220,11 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div style="width:100%;max-width:340px;background:var(--card);border-radius:16px;padding:26px">
     <div class="mark" style="margin-bottom:14px">SLS</div>
     <h2 style="margin:0 0 3px;font-size:19px">Warehouse Management</h2>
-    <p class="muted" style="margin:0 0 18px;font-size:13px">Masuk dengan password RDC Anda</p>
+    <p class="muted" style="margin:0 0 18px;font-size:13px">Masuk dengan User ID dan password WMS Anda</p>
+    <label>User ID</label>
+    <input id="uid" autocomplete="username" placeholder="contoh: wms.jkt.ops" style="margin-bottom:10px;text-transform:lowercase">
     <label>Password</label>
-    <input type="password" id="pw" placeholder="Password" style="margin-bottom:12px">
+    <input type="password" id="pw" autocomplete="current-password" placeholder="Password" style="margin-bottom:12px">
     <button class="btn brand" id="loginBtn">Masuk</button>
     <div id="loginMsg" style="margin-top:10px;font-size:13px;color:var(--stop)"></div>
   </div>
@@ -746,20 +748,24 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 
 // ---------- login (reuses the same auth as the dashboard) ----------
 document.getElementById('loginBtn').addEventListener('click',doLogin);
+document.getElementById('uid').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('pw').focus();});
 document.getElementById('pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 async function doLogin(){
-  const pw=document.getElementById('pw').value.trim(), msg=document.getElementById('loginMsg');
-  if(!pw){msg.textContent='Password belum diisi.';return;}
+  const uid=document.getElementById('uid').value.trim().toLowerCase();
+  const pw=document.getElementById('pw').value;
+  const msg=document.getElementById('loginMsg');
+  if(!uid||!pw){msg.textContent='User ID dan password wajib diisi.';return;}
   msg.textContent='Memeriksa…'; msg.style.color='var(--muted)';
   try{
-    const acct=await rpc('verify_password',{input_password:pw});
-    if(!acct){msg.textContent='Password salah.';msg.style.color='var(--stop)';return;}
+    const acct=await rpc('verify_login',{input_username:uid,input_password:pw});
+    if(!acct){msg.textContent='User ID atau password salah.';msg.style.color='var(--stop)';return;}
     ROLE=acct.role; EFFECTIVE_ROLE=normalizeRole(ROLE); SCOPE=acct.rdc_name;
-    const email=await rpc('get_login_email',{input_password:pw});
+    const email=await rpc('get_login_email',{input_username:uid,input_password:pw});
+    if(!email){msg.textContent='Akun tidak terhubung ke sesi WMS.';msg.style.color='var(--stop)';return;}
     const r=await fetch(`${SB}/auth/v1/token?grant_type=password`,{method:'POST',
       headers:{'apikey':ANON,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
-    if(!r.ok){msg.textContent='Gagal membuat sesi aman. Hubungi admin.';msg.style.color='var(--stop)';return;}
-    TOKEN=(await r.json()).access_token;
+    if(!r.ok){msg.textContent='User ID benar, tetapi sesi Auth belum tersedia. Hubungi MASTER.';msg.style.color='var(--stop)';return;}
+    const auth=await r.json(); TOKEN=auth.access_token;
     document.getElementById('loginView').style.display='none';
     document.getElementById('appView').style.display='block';
     document.getElementById('whoRole').textContent = ROLE_LABELS[EFFECTIVE_ROLE]||EFFECTIVE_ROLE.toUpperCase();
@@ -955,7 +961,7 @@ document.getElementById('puFind').addEventListener('click',async()=>{
         <div class="tk-qty"><b>${fmt(r.qty_to_place)}</b><span>${r.pallet?fmt(r.pallet)+' PALLET':'BOX'}</span></div></div>
         <div class="tk-strip"><div class="bar ${pct>=90?'full':pct>=70?'high':''}"><i style="width:${pct}%"></i></div>
         <div class="muted" style="font-size:12px;margin-top:7px">${esc(r.reason)}</div>
-        <button class="btn brand" style="margin-top:10px" onclick="doPut(${r.kavling_id},'${esc(mat)}','${esc(batch)}',${r.qty_to_place})">
+        <button class="btn brand" style="margin-top:10px" onclick="doPut(${r.kavling_id},'${esc(mat)}','${esc(batch)}',${r.qty_to_place},this)">
           Simpan ke ${esc(r.location_code)}</button>
         <button class="btn ghost" style="margin-top:8px" onclick="puManual('${esc(mat)}','${esc(batch)}',${r.qty_to_place})">
           Pilih kavling lain…</button></div></div>`;
@@ -963,16 +969,35 @@ document.getElementById('puFind').addEventListener('click',async()=>{
     document.getElementById('puOut').innerHTML=h;
   }catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}
 });
-async function doPut(kav,mat,batch,qty){
+async function doPut(kav,mat,batch,qty,btn=null){
+  const out=document.getElementById('puOut');
+  const maxQty=parseFloat(document.getElementById('puMaxQty')?.value)||0;
+  if(qty>maxQty){
+    out.insertAdjacentHTML('afterbegin',`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Putaway ditolak: qty ${fmt(qty)} melebihi stock SAP belum berlokasi ${fmt(maxQty)} box.</div>`);
+    return;
+  }
+  if(btn){btn.disabled=true;btn.dataset.old=btn.textContent;btn.textContent='⏳ Menyimpan…';}
   try{
-    await rpc('wms_move',{p_txn_type:'STOCK_IN',p_material:mat,p_qty:qty,p_batch:batch,
-      p_txn_subtype:document.getElementById('puType').value,p_to_kavling:kav,p_to_status:'GOOD'});
-    document.getElementById('puOut').innerHTML=
-      `<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
-        <div style="font-weight:650;color:var(--ok)">${fmt(qty)} box tersimpan.</div></div>`;
-    loadHome(); loadStock(); loadLoc();
-  }catch(e){ document.getElementById('puOut').insertAdjacentHTML('afterbegin',
-      `<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
+    const r=await rpc('wms_putaway',{
+      p_rdc:RDC,p_material:mat,p_qty:qty,p_batch:batch,
+      p_to_kavling:kav,p_txn_subtype:document.getElementById('puType').value
+    });
+    const rem=Number(r.remaining_unlocated||0);
+    document.getElementById('puMaxQty').value=rem;
+    document.getElementById('puQty').value=rem>0?rem:'';
+    out.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
+      <div style="font-size:22px;margin-bottom:6px">✅</div>
+      <div style="font-weight:750;color:var(--ok)">${fmt(qty)} box berhasil Putaway.</div>
+      <div class="muted" style="font-size:12.5px;margin-top:5px">Sisa stock SAP belum berlokasi: <b>${fmt(rem)} box</b>. Stock lokasi dan unlocated sudah diperbarui bersamaan.</div>
+      ${rem>0?`<button class="btn ghost" style="margin-top:10px" onclick="document.getElementById('puFind').click()">Cari lokasi untuk sisa ${fmt(rem)} box</button>`:''}
+    </div>`;
+    await Promise.allSettled([loadHome(),loadStock(),loadLoc(),loadUnlocated?.()]);
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent=btn.dataset.old||'Simpan';}
+    out.insertAdjacentHTML('afterbegin',
+      `<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)"><b>Putaway gagal.</b><div class="muted" style="font-size:12px;margin-top:5px">${esc(e.message)}</div></div>`);
+    throw e;
+  }
 }
 
 // ---------- stock: lihat bagian STOCK BARU di bawah ----------
@@ -1550,7 +1575,7 @@ async function loadTasks(){
         <div class="lrow" style="cursor:pointer" onclick="openTask(${r.id})">
         <div class="g"><div class="t">${esc(r.filename||'RK')}</div>
         <div class="s">${esc(r.waktu)} · ${fmt(r.baris)} baris · ${fmt(r.total_qty)} box${r.bermasalah?' · '+fmt(r.bermasalah)+' bermasalah':''}</div></div>
-        <span class="pill ${r.status==='SELESAI'?'p-ok':r.status==='BATAL'?'p-stop':'p-warn'}">${esc(r.status)}</span></div>`).join('')+`</div>`
+        <span class="pill ${r.status==='SELESAI'?'p-ok':r.status==='BATAL'?'p-stop':r.status==='PARTIAL'?'p-stop':'p-warn'}">${esc(r.status)}</span></div>`).join('')+`</div>`
       : `<div class="card muted">Belum ada tugas picking.</div>`;
   }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
 }
@@ -1562,13 +1587,15 @@ async function openTask(id){
     const [lines,list]=await Promise.all([rpc('wms_pick_task_lines',{p_task:id}),rpc('wms_pick_task_list',{p_rdc:RDC})]);
     const info=list.find(x=>x.id===id)||{};
     const editable = info.status==='DRAFT';
+    const retryable = info.status==='PARTIAL';
     const byTruck={};
     lines.forEach(l=>{(byTruck[l.truck||'-']=byTruck[l.truck||'-']||[]).push(l);});
     let h=`<div class="card" style="display:flex;align-items:center;gap:8px;padding:11px 14px">
       <div style="flex:1"><div style="font-weight:650;font-size:13.5px">${esc(info.filename||'RK')}</div>
       <div class="muted" style="font-size:12px">${fmt(lines.length)} baris · ${esc(info.waktu||'')}</div></div>
-      <span class="pill ${info.status==='SELESAI'?'p-ok':info.status==='BATAL'?'p-stop':'p-warn'}">${esc(info.status||'')}</span></div>`;
-    if(editable) h+=`<div class="hint">Stock BELUM dipotong. Ubah qty bila ada revisi, lalu tekan Eksekusi.</div>`;
+      <span class="pill ${info.status==='SELESAI'?'p-ok':info.status==='BATAL'?'p-stop':info.status==='PARTIAL'?'p-stop':'p-warn'}">${esc(info.status||'')}</span></div>`;
+    if(editable) h+=`<div class="hint" style="border-color:#EBD5A3;background:var(--warn-bg)"><b>⚠ Stock BELUM dipotong.</b> Tombol <b>Simpan Qty</b> hanya menyimpan revisi angka. Stock baru berkurang setelah tombol <b>Eksekusi & Potong Stock</b> berhasil.</div>`;
+    if(info.status==='PARTIAL') h+=`<div class="hint" style="border-color:#EFC4C0;background:var(--stop-bg)"><b>⚠ Eksekusi sebagian.</b> Sebagian baris sudah memotong stock, sebagian gagal. Sistem hanya akan mencoba ulang baris yang belum selesai.</div>`;
     Object.keys(byTruck).forEach(t=>{
       h+=`<div class="truck"><span class="plate">${esc(t)}</span><span class="cnt">${byTruck[t].length} baris</span></div>`;
       byTruck[t].forEach(l=>{
@@ -1587,34 +1614,68 @@ async function openTask(id){
               <div style="flex:1"><label>Qty ambil</label>
                 <input inputmode="numeric" value="${l.qty_pick??''}" id="ln_${l.id}" ${editable?'':'disabled'}
                   style="padding:9px;font-family:var(--mono);text-align:right"></div>
-              ${editable?`<button class="btn" style="flex:0 0 auto;width:auto;padding:10px 14px" onclick="saveLine(${l.id})">Simpan</button>`:''}
+              ${editable?`<button class="btn" style="flex:0 0 auto;width:auto;padding:10px 14px" onclick="saveLine(${l.id},this)">Simpan Qty</button>`:''}
             </div>
-            ${l.done?'<div class="muted" style="font-size:12px;margin-top:6px">✓ Sudah dipotong</div>':''}
+            ${l.done?'<div style="font-size:12px;margin-top:7px;color:var(--ok);font-weight:700">✅ STOCK SUDAH DIPOTONG</div>':'<div style="font-size:12px;margin-top:7px;color:var(--warn);font-weight:650">⏳ Stock belum dipotong</div>'}
           </div>
           ${l.catatan?`<div class="tk-note">${esc(l.catatan)}</div>`:''}</div>`;
       });
     });
     if(editable){
       h+=`<div style="height:8px"></div>
-        <button class="btn brand" onclick="execTask(${id})">Eksekusi — potong stock sekarang</button>
+        <button class="btn brand" id="execTaskBtn" onclick="execTask(${id},this)">Eksekusi & Potong Stock</button>
         <button class="btn ghost" style="margin-top:8px" onclick="cancelTask(${id})">Batalkan tugas</button>`;
+    }
+    if(retryable){
+      h+=`<div style="height:8px"></div>
+        <button class="btn brand" id="execTaskBtn" onclick="execTask(${id},this)">Coba Lagi Baris yang Gagal</button>`;
+    }
+    if(info.status==='SELESAI'){
+      h+=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg);margin-top:12px;text-align:center">
+        <div style="font-size:26px">✅</div>
+        <div style="font-weight:800;color:var(--ok);margin-top:4px">PICKING SUDAH DIEKSEKUSI</div>
+        <div class="muted" style="font-size:12.5px;margin-top:4px">Stock pada baris di atas sudah dipotong. Tugas ini tidak dapat dieksekusi ulang.</div>
+      </div>`;
     }
     el.innerHTML=h;
   }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
 }
-async function saveLine(id){
-  const v=parseFloat(document.getElementById('ln_'+id).value);
+async function saveLine(id,btn){
+  const input=document.getElementById('ln_'+id);
+  const v=parseFloat(input.value);
   if(!isFinite(v)||v<0){alert('Qty tidak valid.');return;}
-  try{ await rpc('wms_pick_line_edit',{p_line:id,p_qty:v}); openTask(CUR_TASK); }
-  catch(e){ alert('Gagal: '+e.message); }
+  if(btn){btn.disabled=true;btn.textContent='⏳ Menyimpan';}
+  input.disabled=true;
+  try{
+    await rpc('wms_pick_line_edit',{p_line:id,p_qty:v});
+    if(btn){btn.textContent='✓ Qty Tersimpan';btn.style.background='var(--ok)';btn.style.color='#fff';}
+    const note=document.createElement('div');
+    note.style.cssText='font-size:11.5px;color:var(--warn);font-weight:650;margin-top:6px';
+    note.textContent='Qty tersimpan — stock BELUM dipotong. Tekan Eksekusi & Potong Stock untuk final.';
+    btn?.parentElement?.appendChild(note);
+    setTimeout(()=>openTask(CUR_TASK),900);
+  }catch(e){
+    input.disabled=false;
+    if(btn){btn.disabled=false;btn.textContent='Simpan Qty';}
+    alert('Gagal: '+e.message);
+  }
 }
-async function execTask(id){
-  if(!confirm('Potong stock sekarang sesuai tugas ini?\n\nSetelah dieksekusi tidak bisa diubah lagi.')) return;
+async function execTask(id,btn){
+  if(!confirm('EKSEKUSI PICKING & POTONG STOCK SEKARANG?\n\nSimpan Qty saja tidak memotong stock. Tombol ini yang melakukan pengurangan stock aktual.')) return;
+  if(btn){btn.disabled=true;btn.dataset.old=btn.textContent;btn.textContent='⏳ Memotong stock…';}
   try{
     const r=await rpc('wms_pick_task_execute',{p_task:id});
-    alert(`${r.dipotong} baris dipotong dari stock.${r.gagal?'\n'+r.gagal+' gagal.':''}`);
-    openTask(id); loadHome(); loadStock(); loadTasks();
-  }catch(e){ alert('Gagal: '+e.message); }
+    const ok=Number(r.dipotong||0), fail=Number(r.gagal||0);
+    if(r.status==='SELESAI'){
+      alert(`✅ PICKING SELESAI\n${ok} baris berhasil dipotong dari stock.\nTugas dikunci dan tidak dapat dieksekusi ulang.`);
+    }else{
+      alert(`⚠ EKSEKUSI SEBAGIAN\n${ok} baris berhasil dipotong.\n${fail} baris gagal.\nBaris yang sudah berhasil dikunci; hanya baris gagal yang dapat dicoba ulang.`);
+    }
+    await Promise.allSettled([openTask(id),loadHome(),loadStock(),loadTasks()]);
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent=btn.dataset.old||'Eksekusi & Potong Stock';}
+    alert('Gagal: '+e.message);
+  }
 }
 async function cancelTask(id){
   if(!confirm('Batalkan tugas picking ini? Stock tidak akan dipotong.')) return;
@@ -2439,10 +2500,13 @@ async function puManual(mat,batch,qty){
 async function puManualSave(mat,batch){
   const kav=parseInt(document.getElementById('puManKav').value);
   const qty=parseFloat(document.getElementById('puManQty').value);
+  const maxQty=parseFloat(document.getElementById('puMaxQty')?.value)||0;
   const msg=document.getElementById('puManMsg');
+  const btn=document.querySelector('#puManBox .btn.brand');
   if(!kav||!isFinite(qty)||qty<=0){msg.style.color='var(--stop)';msg.textContent='Kavling dan qty wajib diisi.';return;}
+  if(qty>maxQty){msg.style.color='var(--stop)';msg.textContent=`Qty maksimal ${fmt(maxQty)} box sesuai stock SAP belum berlokasi.`;return;}
   msg.style.color='var(--muted)'; msg.textContent='Menyimpan…';
-  try{ await doPut(kav,mat,batch,qty); }
+  try{ await doPut(kav,mat,batch,qty,btn); }
   catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
 }
 ['tfGud','tfBlk','tfKav'].forEach(id=>{const el=document.getElementById(id);
