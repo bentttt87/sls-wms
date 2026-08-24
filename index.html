@@ -309,8 +309,22 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 
 <section class="screen" id="s-put"><div class="wrap">
   <div class="field-title">📥 Receiving / Putaway</div><div class="field-sub">Tempatkan stock SAP yang belum memiliki lokasi ke kavling yang direkomendasikan.</div>
-  <div class="hint">Putaway hanya untuk stock SAP yang belum memiliki lokasi. Pilih dari menu Stock Belum Ada Lokasi; sistem tidak membuat stock baru.</div>
-  <button class="btn ghost" style="margin-bottom:10px" onclick="go('unloc')">Lihat Stock SAP Belum Ada Lokasi</button>
+  <div class="hint">Putaway hanya untuk stock yang berasal dari SAP. Untuk penerimaan baru, upload file penerimaan SAP terlebih dahulu atau pilih stock yang sudah masuk daftar Belum Ada Lokasi.</div>
+  <div class="card" data-perm="SAP_UPLOAD" style="border-color:#C6DEDF;background:var(--field-blue-soft);margin-bottom:12px">
+    <div style="font-weight:750;font-size:14px;margin-bottom:4px">📄 Penerimaan Barang Baru dari SAP</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Upload file hasil penerimaan/GR SAP. Stock masuk sebagai <b>Belum Ada Lokasi</b>, lalu dilanjutkan Putaway. File yang sama tidak dapat diimpor dua kali.</div>
+    <div class="row" style="margin-bottom:8px">
+      <div><label>No. Dokumen SAP / Referensi</label><input id="puRecvRef" placeholder="mis. 5000123456"></div>
+      <div style="max-width:150px"><label>Tanggal terima</label><input id="puRecvDate" type="date"></div>
+    </div>
+    <input type="file" id="puRecvFile" accept=".xlsx,.xls,.csv" style="display:none">
+    <div class="row">
+      <button class="btn ghost" onclick="document.getElementById('puRecvFile').click()">📎 Pilih file SAP…</button>
+      <button class="btn ghost" id="puRecvTemplate">⬇ Template</button>
+    </div>
+    <div id="puRecvOut" style="margin-top:10px"></div>
+  </div>
+  <button class="btn ghost" style="margin-bottom:10px" onclick="go('unloc')">📋 Pilih dari Stock SAP Belum Ada Lokasi</button>
   <div id="puSizeGate"></div><input type="hidden" id="puMaxQty" value="0">
   <div class="card">
     <div class="row" style="margin-bottom:10px">
@@ -797,7 +811,7 @@ async function setupRdc(){
 }
 
 // ---------- screens ----------
-const SUB={home:'RDC · HARI INI',pick:'RK FINAL · PICKING',put:'BARANG MASUK',stock:'STOCK ON HAND',loc:'MASTER LOKASI',zone:'ZONASI UKURAN'};
+const SUB={home:'RDC · HARI INI',pick:'RK FINAL · PICKING',put:'PENERIMAAN SAP · PUTAWAY',stock:'STOCK ON HAND',loc:'MASTER LOKASI',zone:'ZONASI UKURAN'};
 function go(s){
   const target=document.getElementById('s-'+s);
   const required=target?.dataset?.requiredPerm;
@@ -940,6 +954,27 @@ function downloadPickList(fname){
   XLSX.writeFile(wb,'Picking_'+RDC+'_'+fname.replace(/\.[^.]+$/,'')+'.xlsx');
 }
 
+// ---------- penerimaan SAP dari menu Putaway ----------
+let PU_RECV_ROWS=null;
+document.getElementById('puRecvDate').value=new Date().toISOString().slice(0,10);
+document.getElementById('puRecvFile')?.addEventListener('change',e=>{if(e.target.files.length)readReceivingFile(e.target.files[0]);e.target.value='';});
+document.getElementById('puRecvTemplate')?.addEventListener('click',()=>{
+  const wb=XLSX.utils.book_new(); const data=[['Material','Description','Series_Batch','Qty_Box','Storage_Location'],['1G337106','Vivaz Bianco','R146S',100,''],['163801R','dTube White','S050S',80,'']]; const ws=XLSX.utils.aoa_to_sheet(data); ws['!cols']=[{wch:18},{wch:28},{wch:18},{wch:12},{wch:18}]; XLSX.utils.book_append_sheet(wb,ws,'Penerimaan SAP'); XLSX.writeFile(wb,'Template_Penerimaan_SAP_WMS.xlsx');
+});
+function parseReceivingWorkbook(wb){
+  const norm=x=>String(x||'').trim().toLowerCase().replace(/\s+/g,'_');
+  const aliases={material:['material','material_code','kode_material','sku'],desc:['description','material_description','desc','deskripsi'],batch:['series_batch','batch','series','seri'],qty:['qty_box','qty','quantity','unrestricted','stock'],sloc:['storage_location','sloc','s_loc']};
+  const find=(H,a)=>{for(const x of a){const i=H.indexOf(x);if(i>=0)return i;}return -1;};
+  for(const sn of wb.SheetNames){const g=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:null,raw:true});if(!g.length)continue;let hr=-1,H=[];for(let i=0;i<Math.min(15,g.length);i++){H=(g[i]||[]).map(norm);if(find(H,aliases.material)>=0&&find(H,aliases.qty)>=0){hr=i;break;}}if(hr<0)continue;const cm=find(H,aliases.material),cd=find(H,aliases.desc),cb=find(H,aliases.batch),cq=find(H,aliases.qty),cs=find(H,aliases.sloc);const out=[];for(let i=hr+1;i<g.length;i++){const r=g[i]||[],m=String(r[cm]||'').trim();if(!m)continue;const q=Number(r[cq])||0;if(q<=0)continue;out.push({material:m.toUpperCase(),desc:cd>=0?String(r[cd]||''):'',batch:cb>=0?String(r[cb]||'').trim():'',qty:q,sloc:cs>=0?String(r[cs]||'').trim():''});}if(out.length)return out;}return [];
+}
+function readReceivingFile(file){
+  const out=document.getElementById('puRecvOut');out.innerHTML='<div class="muted">⏳ Membaca file penerimaan…</div>';const fr=new FileReader();fr.onload=ev=>{try{const wb=XLSX.read(ev.target.result,{type:'binary'}),rows=parseReceivingWorkbook(wb);if(!rows.length){out.innerHTML='<div class="denied">File tidak dikenali. Minimal harus ada kolom Material dan Qty.</div>';return;}PU_RECV_ROWS={filename:file.name,rows};const qty=rows.reduce((a,r)=>a+Number(r.qty||0),0),mats=new Set(rows.map(r=>r.material));out.innerHTML=`<div style="font-weight:700">${esc(file.name)}</div><div class="muted" style="font-size:12px;margin:4px 0 9px">${fmt(rows.length)} baris · ${fmt(mats.size)} material · ${fmt(qty)} box</div><button class="btn brand" id="puRecvImport">Import sebagai Penerimaan SAP</button>`;document.getElementById('puRecvImport').onclick=importReceiving;}catch(e){out.innerHTML=`<div class="denied">Gagal membaca: ${esc(e.message)}</div>`;}};fr.readAsBinaryString(file);
+}
+async function importReceiving(){
+  const out=document.getElementById('puRecvOut'),ref=document.getElementById('puRecvRef').value.trim(),date=document.getElementById('puRecvDate').value;if(!PU_RECV_ROWS)return;if(!ref){out.insertAdjacentHTML('afterbegin','<div class="denied" style="margin-bottom:8px">No. Dokumen SAP / referensi wajib diisi untuk mencegah double import.</div>');return;}const b=document.getElementById('puRecvImport');b.disabled=true;b.textContent='⏳ Mengimpor…';
+  try{const r=await rpc('wms_receiving_import',{p_rdc:RDC,p_reference:ref,p_filename:PU_RECV_ROWS.filename,p_date:date,p_rows:PU_RECV_ROWS.rows});out.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg);margin:0"><div style="font-size:22px">✅</div><div style="font-weight:750;color:var(--ok)">${fmt(r.qty)} box penerimaan SAP berhasil masuk.</div><div class="muted" style="font-size:12px;margin-top:5px">Stock sekarang berada di Belum Ada Lokasi. Material baru wajib diklasifikasikan ukuran sebelum Putaway.</div><button class="btn ghost" style="margin-top:9px" onclick="go('unloc')">Lihat Stock Belum Ada Lokasi</button></div>`;PU_RECV_ROWS=null;document.getElementById('puRecvRef').value='';await refreshZoneCache().catch(()=>{});loadHome();}catch(e){b.disabled=false;b.textContent='Import sebagai Penerimaan SAP';out.insertAdjacentHTML('afterbegin',`<div class="denied" style="margin-bottom:8px">Gagal: ${esc(e.message)}</div>`);}
+}
+
 // ---------- putaway ----------
 document.getElementById('puFind').addEventListener('click',async()=>{
   const mat=document.getElementById('puMat').value.trim().toUpperCase();
@@ -951,6 +986,7 @@ document.getElementById('puFind').addEventListener('click',async()=>{
   if(maxQty<=0){msg.style.color='var(--stop)';msg.textContent='Putaway ditolak: stock harus berasal dari daftar SAP Belum Ada Lokasi.';return;}
   if(qty>maxQty){msg.style.color='var(--stop)';msg.textContent=`Putaway ditolak: qty ${fmt(qty)} melebihi stock SAP belum berlokasi ${fmt(maxQty)} box.`;return;}
   try{
+    await refreshZoneCache().catch(()=>{});
     const sizeCat=getMaterialSizeCategory(mat);
     const gate=document.getElementById('puSizeGate');
     if(!sizeCat){
@@ -1108,15 +1144,15 @@ async function loadOpPending(){
         <div class="tk-qty"><b>${Number(r.selisih)>0?'+':''}${fmt(r.selisih)}</b><span>SELISIH</span></div></div>
         <div class="tk-strip"><div class="muted" style="font-size:12.5px">Sistem ${fmt(r.qty_system)} · Fisik ${fmt(r.qty_physical)}</div>
         <div class="muted" style="font-size:12px;margin-top:6px">Tahap: <b>${esc(r.tahap||'')}</b>${r.spv_by?' · Spv: '+esc(r.spv_by):''}</div>
-        ${((EFFECTIVE_ROLE==='master'&&r.spv_status)||(EFFECTIVE_ROLE==='supervisor'&&!r.spv_status))?`<div class="row" style="margin-top:10px">
-          <button class="btn" style="padding:10px" onclick="opDecide(${r.id},true)">${EFFECTIVE_ROLE==='master'?'Setujui (Manager)':'Setujui (Spv)'}</button>
+        ${(((EFFECTIVE_ROLE==='rdc_manager'||EFFECTIVE_ROLE==='master')&&r.spv_status)||(EFFECTIVE_ROLE==='supervisor'&&!r.spv_status))?`<div class="row" style="margin-top:10px">
+          <button class="btn" style="padding:10px" onclick="opDecide(${r.id},true)">${(EFFECTIVE_ROLE==='rdc_manager'||EFFECTIVE_ROLE==='master')?'Setujui (RDC Manager)':'Setujui (Supervisor)'}</button>
           <button class="btn ghost" style="padding:10px" onclick="opDecide(${r.id},false)">Tolak</button></div>`
-          :`<div class="muted" style="margin-top:8px;font-size:12.5px">${r.spv_status?'Menunggu persetujuan Manager.':'Menunggu persetujuan Spv.'}</div>`}
+          :`<div class="muted" style="margin-top:8px;font-size:12.5px">${r.spv_status?'Menunggu persetujuan RDC Manager.':'Menunggu persetujuan Supervisor.'}</div>`}
         </div></div>`;}).join('');
   }catch(e){ el.innerHTML=''; }
 }
 async function opDecide(id,ok){
-  try{ await rpc('wms_opname_approve',{p_id:id,p_approve:ok}); loadOpPending(); loadHome(); loadStock(); }
+  try{ await rpc('wms_opname_approve',{p_id:id,p_approve:ok,p_catatan:null}); loadOpPending(); loadHome(); loadStock(); }
   catch(e){ alert('Gagal: '+e.message); }
 }
 
@@ -1309,13 +1345,14 @@ async function loadUnloc(){
   const el=document.getElementById('unlocOut');
   el.innerHTML='<div class="card muted">⏳ Memuat…</div>';
   try{
+    await refreshZoneCache().catch(()=>{});
     const rows=await rpc('wms_unlocated',{p_rdc:RDC,p_limit:200});
     el.innerHTML = rows.length
       ? `<div class="card" style="padding:4px 14px">`+rows.map(r=>`
         <div class="lrow" style="cursor:pointer" onclick="prefillPutaway('${esc(r.material_code)}','${esc(r.batch)}',${r.qty})">
         <div class="g"><div class="t">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''}</div>
         <div class="s">${esc(r['desc']||'')}</div>
-        ${typeof getMaterialSize==='function' && !getMaterialSize(r.material_code)?'<div style="font-size:11px;color:var(--warn);margin-top:3px">⚠ MATERIAL BARU — kategori ukuran wajib ditentukan sebelum Putaway</div>':''}</div>
+        ${!getMaterialSizeCategory(r.material_code)?'<div style="font-size:11px;color:var(--warn);margin-top:3px">⚠ MATERIAL BARU — kategori ukuran wajib ditentukan sebelum Putaway</div>':''}</div>
         <div style="text-align:right"><div class="n">${fmt(r.qty)}</div>
         ${r.status==='DAMAGED'?'<span class="pill p-stop">RUSAK</span>':'<span class="pill p-warn">PERLU LOKASI</span>'}</div></div>`).join('')+`</div>`
       : `<div class="card muted">Semua stock sudah punya lokasi.</div>`;
@@ -1932,7 +1969,7 @@ function sessionExpired(){
 // 3) Tombol kembali di setiap layar selain Hari Ini
 const HOME_OF={pick:'home',put:'home',stock:'home',opname:'home',more:'home',
   loc:'more',rusak:'more',arsip:'more',sap:'more',unloc:'more',recon:'more',
-  import:'more',tasks:'more',task:'tasks',transfer:'more',sync:'more'};
+  import:'more',tasks:'more',task:'tasks',transfer:'more',sync:'more',zone:'more',access:'more'};
 function ensureBackButtons(){
   Object.keys(HOME_OF).forEach(s=>{
     const sec=document.getElementById('s-'+s); if(!sec) return;
@@ -2169,22 +2206,19 @@ document.getElementById('kpSave').addEventListener('click',async()=>{
 });
 
 
-// ================= ZONASI UKURAN + KLASIFIKASI MATERIAL =================
-// Frontend-compatible persistence. Data is scoped per RDC and survives browser reloads.
-// When a server-side table/RPC is added later, these helpers can be replaced without changing the UI.
+// ================= ZONASI UKURAN + KLASIFIKASI MATERIAL (SUPABASE) =================
 let ZN_MATERIALS=[];
-const znKey=()=>`wms_size_zones_${RDC||'NA'}`;
-const zmKey=()=>`wms_material_size_${RDC||'NA'}`;
-function znRead(){try{return JSON.parse(localStorage.getItem(znKey())||'[]')}catch(e){return []}}
-function znWrite(v){localStorage.setItem(znKey(),JSON.stringify(v||[]));}
-function zmRead(){try{return JSON.parse(localStorage.getItem(zmKey())||'{}')}catch(e){return {}}}
-function zmWrite(v){localStorage.setItem(zmKey(),JSON.stringify(v||{}));}
+let ZN_CACHE=[];
+let ZM_CACHE={};
 function normSize(v){return String(v||'').trim().toUpperCase().replace(/\s+/g,'').replace(/[×X]/g,'x');}
-function getMaterialSizeCategory(mat){const m=zmRead();return m[String(mat||'').trim().toUpperCase()]||null;}
-function getZoneForMaterial(mat){
-  const size=getMaterialSizeCategory(mat); if(!size) return null;
-  const zones=znRead().filter(z=>normSize(z.size)===normSize(size));
-  return zones.length?zones:null;
+function getMaterialSizeCategory(mat){return ZM_CACHE[String(mat||'').trim().toUpperCase()]||null;}
+function getZoneForMaterial(mat){const s=getMaterialSizeCategory(mat);return s?ZN_CACHE.filter(z=>normSize(z.size)===normSize(s)):[];}
+async function refreshZoneCache(){
+  const [zones,map]=await Promise.all([
+    rpc('wms_zone_list',{p_rdc:RDC}).catch(()=>[]),
+    rpc('wms_material_size_list',{p_rdc:RDC}).catch(()=>({}))
+  ]);
+  ZN_CACHE=zones||[]; ZM_CACHE=map||{};
 }
 async function loadZoneMaster(){
   const whSel=document.getElementById('znWh'); if(!whSel) return;
@@ -2192,101 +2226,45 @@ async function loadZoneMaster(){
     const [whs,blocks]=await Promise.all([
       rpc('wms_warehouse_options',{p_rdc:RDC}).catch(()=>[]),
       rpc('wms_block_options',{p_rdc:RDC}).catch(()=>[])]);
+    await refreshZoneCache();
     whSel.innerHTML=(whs||[]).map(w=>`<option value="${w.warehouse_id}" data-g="${esc(w.gudang)}">Gudang ${esc(w.gudang)}</option>`).join('');
-    whSel.onchange=()=>renderZoneBlocks(blocks||[]);
-    whSel._blocks=blocks||[];
-    renderZoneBlocks(blocks||[]);
-  }catch(e){ document.getElementById('znMsg').textContent='Gagal memuat master lokasi: '+e.message; }
-  renderZones();
-  await loadZoneMaterials();
+    whSel.onchange=()=>renderZoneBlocks(blocks||[]); whSel._blocks=blocks||[]; renderZoneBlocks(blocks||[]);
+    renderZones(); await loadZoneMaterials();
+  }catch(e){ document.getElementById('znMsg').textContent='Gagal memuat zonasi: '+e.message; }
 }
 function renderZoneBlocks(blocks){
   const sel=document.getElementById('znWh'), box=document.getElementById('znBlocks'); if(!sel||!box) return;
-  const gud=sel.options[sel.selectedIndex]?.dataset.g||'';
-  const rows=(blocks||[]).filter(b=>String(b.gudang)===String(gud));
+  const gud=sel.options[sel.selectedIndex]?.dataset.g||''; const rows=(blocks||[]).filter(b=>String(b.gudang)===String(gud));
   box.innerHTML=rows.length?rows.map(b=>`<label style="display:flex;align-items:center;gap:8px;text-transform:none;font-family:inherit;font-size:13px;margin:5px 0;color:var(--ink)"><input type="checkbox" class="znBlk" value="${b.block_id}" data-code="${esc(b.block)}" style="width:18px;height:18px">Block ${esc(b.block)} <span class="muted">(${fmt(b.jml_kavling)} kavling)</span></label>`).join(''):'<div class="muted">Belum ada block pada gudang ini.</div>';
 }
-function zoneSizes(){return [...new Set(znRead().map(z=>normSize(z.size)).filter(Boolean))].sort();}
+function zoneSizes(){return [...new Set(ZN_CACHE.map(z=>normSize(z.size)).filter(Boolean))].sort();}
 function renderZones(){
-  const rows=znRead(), out=document.getElementById('znList'); if(!out) return;
-  const grouped={}; rows.forEach(z=>(grouped[z.gudang]=grouped[z.gudang]||[]).push(z));
-  let h=''; Object.keys(grouped).sort().forEach(g=>{
-    const total=grouped[g].reduce((a,z)=>a+Number(z.pct||0),0);
-    h+=`<div class="eyebrow">Gudang ${esc(g)} · alokasi ${total}%</div><div class="card" style="padding:4px 14px">`+
-      grouped[g].map(z=>`<div class="lrow"><div class="g"><div class="t">Zona ${esc(z.size)}</div><div class="s">${Number(z.pct)||0}% luas${z.blocks?.length?' · Block '+z.blocks.map(b=>esc(b.code)).join(', '):' · block belum ditentukan'}${z.note?' · '+esc(z.note):''}</div></div><button class="btn ghost" style="width:auto;padding:6px 10px;font-size:12px" onclick="deleteZone('${z.id}')">Hapus</button></div>`).join('')+'</div>';
-  });
+  const rows=ZN_CACHE, out=document.getElementById('znList'); if(!out) return; const grouped={}; rows.forEach(z=>(grouped[z.gudang]=grouped[z.gudang]||[]).push(z));
+  let h=''; Object.keys(grouped).sort().forEach(g=>{const total=grouped[g].reduce((a,z)=>a+Number(z.pct||0),0);h+=`<div class="eyebrow">Gudang ${esc(g)} · alokasi ${total}%</div><div class="card" style="padding:4px 14px">`+grouped[g].map(z=>`<div class="lrow"><div class="g"><div class="t">Zona ${esc(z.size)}</div><div class="s">${Number(z.pct)||0}% luas${z.blocks?.length?' · Block '+z.blocks.map(b=>esc(b.code)).join(', '):' · block belum ditentukan'}${z.note?' · '+esc(z.note):''}</div></div><button class="btn ghost" style="width:auto;padding:6px 10px;font-size:12px" onclick="deleteZone(${z.id})">Hapus</button></div>`).join('')+'</div>';});
   out.innerHTML=h||'<div class="card muted">Belum ada zonasi ukuran.</div>';
-  const zs=zoneSizes(), sel=document.getElementById('zmSize');
-  if(sel) sel.innerHTML=zs.length?zs.map(x=>`<option>${esc(x)}</option>`).join(''):'<option value="">Buat zona dahulu</option>';
+  const zs=zoneSizes(), sel=document.getElementById('zmSize'); if(sel) sel.innerHTML=zs.length?zs.map(x=>`<option>${esc(x)}</option>`).join(''):'<option value="">Buat zona dahulu</option>';
   refreshHomeZoneAlert();
 }
-document.getElementById('znSave')?.addEventListener('click',()=>{
-  const msg=document.getElementById('znMsg'), wh=document.getElementById('znWh');
-  const gud=wh.options[wh.selectedIndex]?.dataset.g||'', wid=wh.value;
-  const size=normSize(document.getElementById('znSize').value), pct=Number(document.getElementById('znPct').value);
-  const note=document.getElementById('znNote').value.trim();
-  const blocks=[...document.querySelectorAll('.znBlk:checked')].map(x=>({id:Number(x.value),code:x.dataset.code}));
-  if(!gud||!size||!isFinite(pct)||pct<=0){msg.style.color='var(--stop)';msg.textContent='Gudang, kategori ukuran, dan % luas wajib diisi.';return;}
-  const rows=znRead();
-  const current=rows.filter(z=>z.gudang===gud).reduce((a,z)=>a+Number(z.pct||0),0);
-  if(current+pct>100.0001){msg.style.color='var(--stop)';msg.textContent=`Total alokasi Gudang ${gud} menjadi ${current+pct}%. Maksimal 100%.`;return;}
-  const duplicate=rows.some(z=>z.gudang===gud&&normSize(z.size)===size);
-  if(duplicate){msg.style.color='var(--stop)';msg.textContent=`Zona ${size} di Gudang ${gud} sudah ada.`;return;}
-  rows.push({id:'Z'+Date.now(),warehouse_id:Number(wid),gudang:gud,size,pct,blocks,note,created_at:new Date().toISOString()}); znWrite(rows);
-  msg.style.color='var(--ok)';msg.textContent='✓ Zona ukuran tersimpan.';
-  document.getElementById('znSize').value='';document.getElementById('znPct').value='';document.getElementById('znNote').value='';
-  document.querySelectorAll('.znBlk:checked').forEach(x=>x.checked=false); renderZones(); renderZoneMaterials();
+document.getElementById('znSave')?.addEventListener('click',async()=>{
+  const msg=document.getElementById('znMsg'), wh=document.getElementById('znWh'); const wid=Number(wh.value), size=normSize(document.getElementById('znSize').value), pct=Number(document.getElementById('znPct').value), note=document.getElementById('znNote').value.trim(); const blocks=[...document.querySelectorAll('.znBlk:checked')].map(x=>String(x.value));
+  if(!wid||!size||!isFinite(pct)||pct<=0||!blocks.length){msg.style.color='var(--stop)';msg.textContent='Gudang, ukuran, % luas, dan minimal satu Block wajib diisi.';return;}
+  msg.style.color='var(--muted)';msg.textContent='Menyimpan ke database…';
+  try{await rpc('wms_zone_save',{p_rdc:RDC,p_warehouse_id:wid,p_ukuran:size,p_persen:pct,p_note:note||null,p_block_ids:blocks,p_id:null}); await refreshZoneCache(); renderZones(); renderZoneMaterials(); msg.style.color='var(--ok)';msg.textContent='✓ Zonasi tersimpan dan berlaku untuk semua user RDC.'; document.getElementById('znSize').value='';document.getElementById('znPct').value='';document.getElementById('znNote').value='';document.querySelectorAll('.znBlk:checked').forEach(x=>x.checked=false);}catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}
 });
-function deleteZone(id){
-  if(!confirm('Hapus zonasi ini? Mapping material tetap tersimpan, tetapi putaway perlu zona ukuran yang tersedia.')) return;
-  znWrite(znRead().filter(z=>z.id!==id)); renderZones(); renderZoneMaterials();
-}
+async function deleteZone(id){if(!confirm('Hapus/nonaktifkan zonasi ini?'))return;try{await rpc('wms_zone_delete',{p_id:id});await refreshZoneCache();renderZones();renderZoneMaterials();}catch(e){alert('Gagal: '+e.message);}}
 async function loadZoneMaterials(){
-  const out=document.getElementById('zmList'); if(!out) return;
-  out.innerHTML='<div class="card muted">⏳ Memuat daftar material…</div>';
-  try{
-    const [stock,unloc,pallet]=await Promise.all([
-      rpc('wms_stock_search',{p_rdc:RDC,p_motif:'',p_seri:'',p_gudang:'',p_block:'',p_kavling:'',p_status:'',p_limit:5000,p_offset:0}).catch(()=>({rows:[]})),
-      rpc('wms_unlocated',{p_rdc:RDC,p_limit:5000}).catch(()=>[]),
-      rpc('wms_pallet_list',{p_rdc:RDC}).catch(()=>[])]);
-    const map={};
-    (stock.rows||[]).forEach(r=>{const k=String(r.material_code||'').toUpperCase();if(k)map[k]={material:k,desc:r.motif||r.desc||'',batch:r.batch||''};});
-    (unloc||[]).forEach(r=>{const k=String(r.material_code||'').toUpperCase();if(k)map[k]={material:k,desc:r.desc||'',batch:r.batch||''};});
-    // Existing pallet master can provide a safe suggestion only; it does not auto-assign.
-    const suggestions={}; (pallet||[]).forEach(p=>{if(p.ukuran&&p.kode_motif)suggestions[String(p.kode_motif).toUpperCase()]=normSize(p.ukuran);});
-    ZN_MATERIALS=Object.values(map).sort((a,b)=>a.material.localeCompare(b.material)).map(m=>{let sug=null,best=0;Object.keys(suggestions).forEach(pre=>{if(m.material.startsWith(pre)&&pre.length>best){best=pre.length;sug=suggestions[pre];}});return {...m,suggested:sug};});
-    renderZoneMaterials();
-  }catch(e){out.innerHTML=`<div class="card muted">Gagal memuat material: ${esc(e.message)}</div>`;}
+  const out=document.getElementById('zmList'); if(!out) return; out.innerHTML='<div class="card muted">⏳ Memuat daftar material…</div>';
+  try{await refreshZoneCache(); const [stock,unloc,pallet]=await Promise.all([rpc('wms_stock_search',{p_rdc:RDC,p_motif:'',p_seri:'',p_gudang:'',p_block:'',p_kavling:'',p_status:'',p_limit:5000,p_offset:0}).catch(()=>({rows:[]})),rpc('wms_unlocated',{p_rdc:RDC,p_limit:5000}).catch(()=>[]),rpc('wms_pallet_list',{p_rdc:RDC}).catch(()=>[])]); const map={};(stock.rows||[]).forEach(r=>{const k=String(r.material_code||'').toUpperCase();if(k)map[k]={material:k,desc:r.motif||r.desc||'',batch:r.batch||''};});(unloc||[]).forEach(r=>{const k=String(r.material_code||'').toUpperCase();if(k)map[k]={material:k,desc:r.desc||'',batch:r.batch||''};});const suggestions={};(pallet||[]).forEach(p=>{if(p.ukuran&&p.kode_motif)suggestions[String(p.kode_motif).toUpperCase()]=normSize(p.ukuran);});ZN_MATERIALS=Object.values(map).sort((a,b)=>a.material.localeCompare(b.material)).map(m=>{let sug=null,best=0;Object.keys(suggestions).forEach(pre=>{if(m.material.startsWith(pre)&&pre.length>best){best=pre.length;sug=suggestions[pre];}});return {...m,suggested:sug};});renderZoneMaterials();}catch(e){out.innerHTML=`<div class="card muted">Gagal memuat material: ${esc(e.message)}</div>`;}
 }
 function renderZoneMaterials(){
-  const out=document.getElementById('zmList'), alert=document.getElementById('zmAlert'); if(!out) return;
-  const q=(document.getElementById('zmSearch')?.value||'').trim().toUpperCase(), mp=zmRead();
-  const rows=ZN_MATERIALS.filter(m=>!q||m.material.includes(q)||String(m.desc||'').toUpperCase().includes(q)).slice(0,500);
-  const uncat=ZN_MATERIALS.filter(m=>!mp[m.material]).length;
-  if(alert) alert.innerHTML=uncat?`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg)"><div style="font-weight:650;color:var(--warn)">${fmt(uncat)} material belum memiliki kategori ukuran</div><div class="muted" style="font-size:12px;margin-top:4px">Material baru/unknown akan ditahan dari Putaway sampai kategori ukuran ditetapkan.</div></div>`:`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)"><div style="font-weight:650;color:var(--ok)">Semua material sudah dikategorikan.</div></div>`;
-  out.innerHTML=rows.length?`<div class="card" style="padding:4px 14px">${rows.map(m=>`<div class="lrow"><input type="checkbox" class="zmChk" value="${esc(m.material)}" style="width:18px;height:18px;flex:0 0 auto"><div class="g"><div class="t">${esc(m.material)}</div><div class="s">${esc(m.desc||'')}${m.suggested&&!mp[m.material]?' · saran dari master: '+esc(m.suggested):''}</div></div><div style="text-align:right">${mp[m.material]?`<span class="pill p-ok">${esc(mp[m.material])}</span>`:'<span class="pill p-warn">BELUM DIATUR</span>'}</div></div>`).join('')}</div>`:'<div class="card muted">Tidak ada material yang cocok.</div>';
-  refreshHomeZoneAlert();
+  const out=document.getElementById('zmList'), alert=document.getElementById('zmAlert');if(!out)return;const q=(document.getElementById('zmSearch')?.value||'').trim().toUpperCase();const rows=ZN_MATERIALS.filter(m=>!q||m.material.includes(q)||String(m.desc||'').toUpperCase().includes(q)).slice(0,500);const uncat=ZN_MATERIALS.filter(m=>!ZM_CACHE[m.material]).length;
+  if(alert)alert.innerHTML=uncat?`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg)"><div style="font-weight:650;color:var(--warn)">${fmt(uncat)} material belum memiliki kategori ukuran</div><div class="muted" style="font-size:12px;margin-top:4px">Material baru ditahan dari Putaway sampai RDC Manager menetapkan kategori.</div></div>`:`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)"><div style="font-weight:650;color:var(--ok)">Semua material sudah dikategorikan.</div></div>`;
+  out.innerHTML=rows.length?`<div class="card" style="padding:4px 14px">${rows.map(m=>`<div class="lrow"><input type="checkbox" class="zmChk" value="${esc(m.material)}" style="width:18px;height:18px;flex:0 0 auto"><div class="g"><div class="t">${esc(m.material)}</div><div class="s">${esc(m.desc||'')}${m.suggested&&!ZM_CACHE[m.material]?' · saran master: '+esc(m.suggested):''}</div></div><div style="text-align:right">${ZM_CACHE[m.material]?`<span class="pill p-ok">${esc(ZM_CACHE[m.material])}</span>`:'<span class="pill p-warn">BELUM DIATUR</span>'}</div></div>`).join('')}</div>`:'<div class="card muted">Tidak ada material yang cocok.</div>';refreshHomeZoneAlert();
 }
 document.getElementById('zmSearch')?.addEventListener('input',renderZoneMaterials);
-document.getElementById('zmAssign')?.addEventListener('click',()=>{
-  const msg=document.getElementById('zmMsg'), size=normSize(document.getElementById('zmSize').value);
-  const ids=[...document.querySelectorAll('.zmChk:checked')].map(x=>String(x.value).toUpperCase());
-  if(!size){msg.style.color='var(--stop)';msg.textContent='Belum ada kategori ukuran. Buat zonasi dahulu.';return;}
-  if(!ids.length){msg.style.color='var(--stop)';msg.textContent='Pilih minimal satu material.';return;}
-  const mp=zmRead(); ids.forEach(id=>mp[id]=size); zmWrite(mp);
-  msg.style.color='var(--ok)';msg.textContent=`✓ ${ids.length} material ditetapkan ke kategori ${size}.`; renderZoneMaterials();
-});
-function refreshHomeZoneAlert(){
-  const el=document.getElementById('homeZoneAlert'); if(!el) return;
-  const mp=zmRead(), known=new Set(ZN_MATERIALS.map(m=>m.material));
-  const n=[...known].filter(k=>!mp[k]).length;
-  const zones=znRead(), by={}; zones.forEach(z=>(by[z.gudang]=by[z.gudang]||0,by[z.gudang]+=Number(z.pct||0)));
-  const incomplete=Object.entries(by).filter(([g,p])=>p<99.999).map(([g,p])=>`${g} ${p}%`);
-  let parts=[]; if(n)parts.push(`${fmt(n)} material belum dikategorikan`); if(incomplete.length)parts.push(`alokasi zonasi belum 100%: ${incomplete.join(', ')}`);
-  el.innerHTML=parts.length?`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg);margin-top:12px"><div style="font-weight:650;color:var(--warn)">Perlu perhatian zonasi ukuran</div><div class="muted" style="font-size:12px;margin-top:4px">${esc(parts.join(' · '))}</div></div>`:'';
-}
-const _goZone=go;
-go=function(s){_goZone(s);if(s==='zone')loadZoneMaster();};
+document.getElementById('zmAssign')?.addEventListener('click',async()=>{const msg=document.getElementById('zmMsg'),size=normSize(document.getElementById('zmSize').value),ids=[...document.querySelectorAll('.zmChk:checked')].map(x=>String(x.value).toUpperCase());if(!size){msg.style.color='var(--stop)';msg.textContent='Buat zonasi dahulu.';return;}if(!ids.length){msg.style.color='var(--stop)';msg.textContent='Pilih minimal satu material.';return;}msg.style.color='var(--muted)';msg.textContent='Menyimpan…';try{const r=await rpc('wms_material_size_save',{p_rdc:RDC,p_materials:ids,p_ukuran:size});await refreshZoneCache();msg.style.color='var(--ok)';msg.textContent=`✓ ${r.assigned} material ditetapkan ke ${r.ukuran}.`;renderZoneMaterials();}catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}});
+function refreshHomeZoneAlert(){const el=document.getElementById('homeZoneAlert');if(!el)return;const known=new Set(ZN_MATERIALS.map(m=>m.material)),n=[...known].filter(k=>!ZM_CACHE[k]).length,by={};ZN_CACHE.forEach(z=>(by[z.gudang]=by[z.gudang]||0,by[z.gudang]+=Number(z.pct||0)));const incomplete=Object.entries(by).filter(([g,p])=>p<99.999).map(([g,p])=>`${g} ${p}%`);let parts=[];if(n)parts.push(`${fmt(n)} material belum dikategorikan`);if(incomplete.length)parts.push(`alokasi zonasi belum 100%: ${incomplete.join(', ')}`);el.innerHTML=parts.length?`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg);margin-top:12px"><div style="font-weight:650;color:var(--warn)">Perlu perhatian zonasi ukuran</div><div class="muted" style="font-size:12px;margin-top:4px">${esc(parts.join(' · '))}</div></div>`:'';}
+const _goZone=go;go=function(s){_goZone(s);if(s==='zone')loadZoneMaster();};
 
 // ================= OCCUPANCY =================
 async function loadOccupancy(){
@@ -2493,8 +2471,12 @@ async function puManual(mat,batch,qty){
   const out=document.getElementById('puOut');
   out.insertAdjacentHTML('afterbegin','<div class="card muted" id="puManLoad">⏳ Memuat daftar kavling…</div>');
   try{
-    const targets=await rpc('wms_transfer_targets',{p_rdc:RDC,p_exclude:null});
+    await refreshZoneCache().catch(()=>{});
+    const targetsAll=await rpc('wms_transfer_targets',{p_rdc:RDC,p_exclude:null});
+    const zones=getZoneForMaterial(mat), allowed=new Set(zones.flatMap(z=>(z.blocks||[]).map(b=>String(b.code).toUpperCase())));
+    const targets=targetsAll.filter(t=>allowed.size===0?false:allowed.has(String(t.block||'').toUpperCase()) || [...allowed].some(b=>String(t.location_code||'').toUpperCase().includes('-'+b+'-')));
     document.getElementById('puManLoad')?.remove();
+    if(!targets.length){out.insertAdjacentHTML('afterbegin','<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Tidak ada kavling manual yang sesuai zonasi ukuran material ini.</div>');return;}
     const opts=targets.map(t=>{
       const sisa=t.kapasitas?(t.kapasitas-t.terisi):null;
       return `<option value="${t.kavling_id}">${esc(t.location_code)}${sisa!=null?' — sisa '+fmt(sisa):''}</option>`;}).join('');
