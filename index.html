@@ -750,22 +750,32 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 document.getElementById('loginBtn').addEventListener('click',doLogin);
 document.getElementById('uid').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('pw').focus();});
 document.getElementById('pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+function loginIdentity(uid){
+  const x=uid.toLowerCase();
+  if(x==='master'||x==='wms.master') return {email:'master@sls.internal',role:'master',rdc:null};
+  const m=x.match(/^wms\.(jkt|smg|sby|dps|plb)\.(mgr|spv|ops|view)$/);
+  if(!m) return null;
+  const rdcMap={jkt:'Jakarta',smg:'Semarang',sby:'Surabaya',dps:'Denpasar',plb:'Palembang'};
+  const roleMap={mgr:'rdc_manager',spv:'supervisor',ops:'operator',view:'viewer'};
+  return {email:x+'@sls.internal',role:roleMap[m[2]],rdc:rdcMap[m[1]]};
+}
 async function doLogin(){
   const uid=document.getElementById('uid').value.trim().toLowerCase();
   const pw=document.getElementById('pw').value;
   const msg=document.getElementById('loginMsg');
   if(!uid||!pw){msg.textContent='User ID dan password wajib diisi.';return;}
-  msg.textContent='Memeriksa…'; msg.style.color='var(--muted)';
+  const ident=loginIdentity(uid);
+  if(!ident){msg.textContent='Format User ID tidak dikenali.';msg.style.color='var(--stop)';return;}
+  msg.textContent='Membuat sesi aman…'; msg.style.color='var(--muted)';
   try{
-    const acct=await rpc('verify_login',{input_username:uid,input_password:pw});
-    if(!acct){msg.textContent='User ID atau password salah.';msg.style.color='var(--stop)';return;}
-    ROLE=acct.role; EFFECTIVE_ROLE=normalizeRole(ROLE); SCOPE=acct.rdc_name;
-    const email=await rpc('get_login_email',{input_username:uid,input_password:pw});
-    if(!email){msg.textContent='Akun tidak terhubung ke sesi WMS.';msg.style.color='var(--stop)';return;}
     const r=await fetch(`${SB}/auth/v1/token?grant_type=password`,{method:'POST',
-      headers:{'apikey':ANON,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
-    if(!r.ok){msg.textContent='User ID benar, tetapi sesi Auth belum tersedia. Hubungi MASTER.';msg.style.color='var(--stop)';return;}
+      headers:{'apikey':ANON,'Content-Type':'application/json'},body:JSON.stringify({email:ident.email,password:pw})});
+    if(!r.ok){
+      msg.textContent='User ID atau password salah / akun belum aktif.';msg.style.color='var(--stop)';
+      return;
+    }
     const auth=await r.json(); TOKEN=auth.access_token;
+    ROLE=ident.role; EFFECTIVE_ROLE=normalizeRole(ROLE); SCOPE=ident.rdc;
     document.getElementById('loginView').style.display='none';
     document.getElementById('appView').style.display='block';
     document.getElementById('whoRole').textContent = ROLE_LABELS[EFFECTIVE_ROLE]||EFFECTIVE_ROLE.toUpperCase();
