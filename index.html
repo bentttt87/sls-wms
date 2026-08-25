@@ -684,6 +684,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
     <div class="lrow" style="cursor:pointer" onclick="go('putex')"><div class="g"><div class="t">Exception Putaway</div><div class="s">Kuota ukuran terlampaui — perlu persetujuan Supervisor</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('reassign')"><div class="g"><div class="t">Reassign Staging</div><div class="s">Excess/Hold dipindah ke RK lain — perlu persetujuan Supervisor</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('recvhist')"><div class="g"><div class="t">Riwayat &amp; Koreksi Penerimaan</div><div class="s">Reversal dokumen SAP salah, upload revisi</div></div><div class="n muted">›</div></div>
+    <div class="lrow" style="cursor:pointer" onclick="go('physcorr')"><div class="g"><div class="t">Koreksi Fisik</div><div class="s">Barang sudah di-Putaway saat dokumen direversal</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('transfer')"><div class="g"><div class="t">Pindah Lokasi Barang</div><div class="s">Mutasi antar kavling</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('tasks')"><div class="g"><div class="t">Tugas Picking</div><div class="s">Draft, revisi, eksekusi</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('import')"><div class="g"><div class="t">Upload Lokasi Barang</div><div class="s">Excel/CSV lokasi atau buat langsung di WMS</div></div><div class="n muted">›</div></div>
@@ -714,6 +715,13 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div class="eyebrow">Riwayat &amp; Koreksi Penerimaan</div>
   <div class="hint">Dokumen penerimaan SAP yang salah dikoreksi lewat <b>Reversal</b> &mdash; dokumen lama tidak dihapus, tapi ditandai REVERSED lalu diganti versi baru. Stock yang sudah terlanjur di-Putaway tidak ditarik otomatis dan akan dilaporkan untuk koreksi fisik.</div>
   <div id="recvHistList"><div class="card muted">Memuat…</div></div>
+</div></section>
+
+<section class="screen" id="s-physcorr"><div class="wrap">
+  <div class="eyebrow">← <span onclick="go('more')" style="cursor:pointer">Lainnya</span></div>
+  <div class="eyebrow">Koreksi Fisik</div>
+  <div class="hint">Muncul ketika dokumen penerimaan direversal tapi sebagian barang <b>sudah terlanjur di-Putaway</b>. Stock fisik <b>tidak diubah otomatis</b> &mdash; Supervisor memverifikasi kondisi fisik dan mengusulkan resolusi, lalu <b>RDC Manager</b> yang menyetujui final sebelum stock berubah.</div>
+  <div id="physCorrList"><div class="card muted">Memuat…</div></div>
 </div></section>
 
 <nav class="nav" style="grid-template-columns:repeat(6,1fr)">
@@ -2195,6 +2203,112 @@ async function putexDecide(id,action){
   }catch(e){ alert('Gagal: '+e.message); }
 }
 
+const RESOLUSI_LABEL={ADJUST_OUT:'Keluarkan dari WMS',RELINK_DOCUMENT:'Pindah ke dokumen lain',RETURN_TO_FACTORY:'Retur ke pabrik',KEEP_PENDING:'Masih diselidiki'};
+async function loadPhysCorr(){
+  const el=document.getElementById('physCorrList');
+  el.innerHTML='<div class="card muted">⏳ Memuat…</div>';
+  try{
+    const rows=await rpc('wms_physical_correction_list',{p_rdc:RDC,p_only_open:false});
+    if(!rows.length){ el.innerHTML='<div class="card muted">Tidak ada tugas koreksi fisik.</div>'; return; }
+    const isSpv=EFFECTIVE_ROLE==='supervisor';
+    const isMgr=EFFECTIVE_ROLE==='rdc_manager'||EFFECTIVE_ROLE==='master';
+    const stMap={PENDING:'warn',IN_PROGRESS:'warn',RESOLVED:'ok',CANCELLED:'stop'};
+    const stLabel={PENDING:'MENUNGGU VERIFIKASI SUPERVISOR',IN_PROGRESS:'MENUNGGU PERSETUJUAN RDC MANAGER',RESOLVED:'SELESAI',CANCELLED:'DIBATALKAN'};
+    const open=rows.filter(r=>r.status==='PENDING'||r.status==='IN_PROGRESS');
+    let head='';
+    if(open.length){
+      const totQty=open.reduce((a,r)=>a+Number(r.qty_affected||0),0);
+      const maxAge=Math.max(...open.map(r=>Number(r.umur_hari||0)));
+      head=`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg)">
+        <div style="font-weight:700;color:var(--warn)">${fmt(open.length)} tugas belum selesai · ${fmt(totQty)} box</div>
+        <div class="muted" style="font-size:12px;margin-top:4px">Tertua ${fmt(maxAge)} hari. Stock masih tercatat di lokasi sampai disetujui RDC Manager.</div></div>`;
+    }
+    el.innerHTML=head+'<div class="eyebrow">Daftar tugas</div>'+rows.map(r=>{
+      const lok=(r.lokasi||[]).map(l=>`${esc(l.location_code)}: ${fmt(l.qty)} box`).join('<br>')||'-';
+      let act='';
+      if(r.status==='PENDING'&&(isSpv||isMgr)){
+        act=`<button class="btn ghost" style="margin-top:9px" onclick="openVerify(${r.id},this)">🔍 Verifikasi Fisik &amp; Usulkan Resolusi</button>`;
+      }else if(r.status==='IN_PROGRESS'){
+        if(r.resolution_type==='KEEP_PENDING'){
+          act=(isSpv||isMgr)?`<button class="btn ghost" style="margin-top:9px" onclick="openVerify(${r.id},this)">↻ Perbarui Resolusi</button>`:'';
+        }else if(isMgr){
+          act=`<div class="row" style="margin-top:10px">
+            <button class="btn" style="padding:10px" onclick="physCorrApprove(${r.id},true)">Setujui &amp; Jalankan</button>
+            <button class="btn ghost" style="padding:10px" onclick="physCorrApprove(${r.id},false)">Kembalikan</button></div>`;
+        }else{
+          act=`<div class="muted" style="margin-top:8px;font-size:12.5px">Menunggu persetujuan RDC Manager.</div>`;
+        }
+      }
+      return `<div class="ticket ${stMap[r.status]||''}">
+        <div class="tk-top"><div class="m">
+          <div class="tk-mat">${esc(r.material_code)} · ${esc(r.batch||'-')}</div>
+          <div class="tk-desc">${esc(r.doc)} · ${esc(r.status_stock)}</div>
+        </div><div class="tk-qty"><b>${fmt(r.qty_affected)}</b><span>BOX</span></div></div>
+        <div class="tk-strip">
+          <div class="muted" style="font-size:11px;font-weight:700;letter-spacing:.04em;margin-bottom:4px">${stLabel[r.status]||esc(r.status)}${Number(r.umur_hari)>0?` · ${fmt(r.umur_hari)} hari`:''}</div>
+          <div class="muted" style="font-size:12.5px;line-height:1.7">
+            Lokasi fisik:<br>${lok}<br>
+            ${esc(r.reason||'')}
+            ${r.verified_by?`<br>Diverifikasi <b>${esc(r.verified_by)}</b>${r.verify_note?' — '+esc(r.verify_note):''}`:''}
+            ${r.resolution_type?`<br>Usulan: <b>${esc(RESOLUSI_LABEL[r.resolution_type]||r.resolution_type)}</b>`:''}
+            ${r.approved_by&&r.status==='RESOLVED'?`<br>Disetujui <b>${esc(r.approved_by)}</b>${r.approval_note?' — '+esc(r.approval_note):''}`:''}
+          </div>${act}
+        </div></div>`;}).join('');
+  }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+}
+
+async function openVerify(id, btn){
+  const strip=btn?btn.closest('.tk-strip'):null;
+  let docs=[];
+  try{ docs=(await rpc('wms_receiving_history',{p_rdc:RDC})).filter(d=>d.status==='ACTIVE'); }catch(e){}
+  const box=document.createElement('div');
+  box.className='card'; box.style.borderColor='#C6DEDF'; box.style.background='var(--field-blue-soft)'; box.style.marginTop='8px';
+  box.innerHTML=`<div style="font-weight:700;margin-bottom:8px">Verifikasi Fisik</div>
+    <div class="muted" style="font-size:12px;margin-bottom:8px">Cek kondisi barang di lokasi, lalu pilih tindakan yang sesuai. Stock belum berubah sampai RDC Manager menyetujui.</div>
+    <label>Hasil verifikasi / catatan</label>
+    <input id="vNote_${id}" placeholder="mis. barang fisik ada, kondisi baik" style="margin-bottom:10px">
+    <label>Usulan resolusi</label>
+    <select id="vRes_${id}" style="margin-bottom:10px" onchange="toggleRelink(${id})">
+      <option value="">— pilih —</option>
+      <option value="ADJUST_OUT">Keluarkan dari WMS (barang memang tidak ada)</option>
+      <option value="RELINK_DOCUMENT">Pindah ke dokumen lain (barang sah, dokumen pengganti)</option>
+      <option value="RETURN_TO_FACTORY">Retur ke pabrik</option>
+      <option value="KEEP_PENDING">Masih diselidiki</option>
+    </select>
+    <div id="vRelinkWrap_${id}" style="display:none;margin-bottom:10px">
+      <label>Dokumen penerimaan tujuan</label>
+      <select id="vRelink_${id}">${docs.map(d=>`<option value="${d.id}">${esc(d.doc_type||'GR')} ${esc(d.doc_number||d.reference||'-')} V${d.version} · ${fmt(d.qty)} box</option>`).join('')||'<option value="">Tidak ada dokumen ACTIVE</option>'}</select>
+    </div>
+    <button class="btn" onclick="submitVerify(${id})">Simpan Verifikasi</button>`;
+  if(strip){ strip.appendChild(box); if(btn) btn.remove(); }
+}
+function toggleRelink(id){
+  const v=document.getElementById(`vRes_${id}`).value;
+  document.getElementById(`vRelinkWrap_${id}`).style.display = (v==='RELINK_DOCUMENT')?'block':'none';
+}
+async function submitVerify(id){
+  const res=document.getElementById(`vRes_${id}`)?.value;
+  const note=document.getElementById(`vNote_${id}`)?.value.trim()||null;
+  if(!res){ alert('Pilih usulan resolusi dulu.'); return; }
+  const relink=(res==='RELINK_DOCUMENT')?Number(document.getElementById(`vRelink_${id}`)?.value)||null:null;
+  if(res==='RELINK_DOCUMENT'&&!relink){ alert('Pilih dokumen penerimaan tujuan.'); return; }
+  try{
+    const r=await rpc('wms_physical_correction_verify',{p_id:id,p_resolution_type:res,p_note:note,p_relink_upload_id:relink});
+    alert(r.catatan||'Verifikasi tersimpan.');
+    await loadPhysCorr();
+  }catch(e){ alert('Gagal: '+e.message); }
+}
+async function physCorrApprove(id, ok){
+  const note=prompt(ok?'Catatan persetujuan (opsional):':'Alasan dikembalikan ke Supervisor:');
+  if(note===null) return;
+  if(ok && !confirm('Setujui dan jalankan resolusi ini? Stock akan berubah sesuai jenis resolusi.')) return;
+  try{
+    const r=await rpc('wms_physical_correction_approve',{p_id:id,p_approve:ok,p_note:note||null});
+    alert(r.catatan||'Selesai.');
+    await Promise.allSettled([loadPhysCorr(),loadHome(),loadStock?.()]);
+  }catch(e){ alert('Gagal: '+e.message); }
+}
+
 let RECV_REVISE_ROWS=null;
 async function loadRecvHist(){
   const el=document.getElementById('recvHistList');
@@ -2922,7 +3036,7 @@ async function occupancyBoxFallback(){
   if(el){el.style.textTransform='uppercase';
     el.addEventListener('input',()=>{const p=el.selectionStart;el.value=el.value.toUpperCase();try{el.setSelectionRange(p,p);}catch(e){}});}});
 const _go8=go;
-const _goPutex=go;go=function(s){ _goPutex(s); if(s==='putex') loadPutex(); if(s==='reassign') loadReassignApproval(); if(s==='recvhist') loadRecvHist(); };
+const _goPutex=go;go=function(s){ _goPutex(s); if(s==='putex') loadPutex(); if(s==='reassign') loadReassignApproval(); if(s==='recvhist') loadRecvHist(); if(s==='physcorr') loadPhysCorr(); };
 
 // ================= (6) JENIS PENGELUARAN PADA PICKING =================
 // pick task now carries jenis: RK / Amsen / Tukar Barang / Retur Pabrik / Others
