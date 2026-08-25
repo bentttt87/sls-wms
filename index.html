@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="id"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>WMS SLS</title>
+<title>WMS SLS Rev.10</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
@@ -277,7 +277,8 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
       <div class="flowstep"><div class="dot">📥</div><span>PUTAWAY</span></div><div class="flowarr">›</div>
       <div class="flowstep"><div class="dot">📍</div><span>LOKASI</span></div><div class="flowarr">›</div>
       <div class="flowstep"><div class="dot">📦</div><span>PICKING</span></div><div class="flowarr">›</div>
-      <div class="flowstep"><div class="dot">✅</div><span>OPNAME</span></div>
+      <div class="flowstep"><div class="dot">🅿️</div><span>STAGING</span></div><div class="flowarr">›</div>
+      <div class="flowstep"><div class="dot">🚚</div><span>DISPATCH</span></div>
     </div>
   </div>
 
@@ -289,8 +290,8 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 </div></section>
 
 <section class="screen" id="s-pick"><div class="wrap">
-  <div class="field-title">📦 Picking</div><div class="field-sub">Ambil barang sesuai RK Final. Sistem mengecek stock dan lokasi sebelum eksekusi.</div>
-  <div class="hint">Upload RK Final → sistem cek ke stock asli → tandai yang salah sebelum barang naik mobil.</div>
+  <div class="field-title">📦 Picking & Staging</div><div class="field-sub">Ambil barang sesuai RK, pindahkan ke Staging, lalu Stock Out hanya saat Dispatch Confirm.</div>
+  <div class="hint"><b>REV.10:</b> Picking tidak lagi langsung Stock Out. Flow baru: AVAILABLE → PICKED/STAGING → DISPATCH CONFIRM → keluar dari inventory.</div>
   <input type="file" id="rkFile" accept=".ods,.xlsx,.xls" style="display:none">
   <div class="card" style="margin-bottom:10px">
     <label>Jenis pengeluaran</label>
@@ -341,8 +342,33 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div id="puOut"></div>
 </div></section>
 
+
+<section class="screen" id="s-staging"><div class="wrap">
+  <div class="field-title">🅿️ Staging & Dispatch</div>
+  <div class="field-sub">Atur lokasi staging dan monitor task yang sudah dipicking sebelum Dispatch.</div>
+
+  <div class="card">
+    <div style="font-weight:750;margin-bottom:5px">Setup Lokasi Staging</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Staging tetap memakai hierarchy Gudang → Block → Line → Kavling. RDC Manager memilih kavling mana yang berfungsi sebagai STAGING.</div>
+    <label>Pilih Kavling</label>
+    <select id="stgLocSel"></select>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="stgSet">Jadikan STAGING</button>
+      <button class="btn ghost" id="stgUnset">Kembalikan STORAGE</button>
+    </div>
+    <div id="stgMsg" style="font-size:12.5px;margin-top:8px"></div>
+  </div>
+
+  <div class="eyebrow">Lokasi Staging Aktif</div>
+  <div id="stgActive"></div>
+
+  <div class="eyebrow">Task Menunggu Dispatch / Revisi</div>
+  <div id="stgTasks"></div>
+</div></section>
+
 <section class="screen" id="s-stock"><div class="wrap">
   <div class="field-title">🔎 Stock On Hand</div><div class="field-sub">Cari material dan lihat posisi stock secara cepat.</div>
+  <div class="hint"><b>REV.10:</b> Stock fisik mencakup STORAGE + STAGING. Barang DISPATCHED tidak lagi dihitung sebagai Stock On Hand.</div>
   <div class="row" style="margin-bottom:8px">
     <div><label>Motif / Kode</label><input id="fMotif" placeholder="mis. Ginza"></div>
     <div style="max-width:120px"><label>Seri</label><input id="fSeri" placeholder="S12S"></div>
@@ -570,22 +596,31 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 </div></section>
 
 <section class="screen" id="s-zone"><div class="wrap">
-  <div class="eyebrow">Zonasi gudang berdasarkan ukuran</div>
-  <div class="hint">Bagi luas tiap gudang berdasarkan kategori ukuran keramik. Total alokasi per gudang maksimal 100%. Material wajib memiliki kategori ukuran sebelum Putaway.</div>
+  <div class="eyebrow">Kuota kapasitas per ukuran &middot; se-RDC</div>
+  <div class="hint">Tetapkan berapa persen kapasitas RDC dialokasikan untuk tiap ukuran. Barang boleh tersebar di gudang, block, line, atau kavling mana pun &mdash; kuota dipakai untuk memantau ukuran mana yang <b>low</b> dan mana yang <b>overload</b>. Total alokasi maksimal 100%.</div>
   <div class="card">
     <div class="row" style="margin-bottom:10px">
-      <div><label>Gudang</label><select id="znWh"></select></div>
-      <div><label>Kategori ukuran</label><input id="znSize" placeholder="30x30"></div>
+      <div><label>Kategori ukuran</label><input id="znSize" placeholder="60x60"></div>
+      <div><label>% kapasitas RDC</label><input id="znPct" inputmode="decimal" placeholder="30"></div>
     </div>
-    <div class="row" style="margin-bottom:10px">
-      <div><label>% luas gudang</label><input id="znPct" inputmode="decimal" placeholder="30"></div>
-      <div><label>Keterangan</label><input id="znNote" placeholder="mis. Keramik 30x30"></div>
-    </div>
-    <div style="margin-bottom:12px"><label>Block yang termasuk zona ini</label><div id="znBlocks" class="card" style="padding:8px;margin:0;background:#FBFAF8"></div></div>
-    <button class="btn" id="znSave">Simpan zona ukuran</button>
+    <div style="margin-bottom:12px"><label>Keterangan</label><input id="znNote" placeholder="mis. Granit 60x60"></div>
+    <button class="btn" id="znSave">Simpan kuota ukuran</button>
     <div id="znMsg" style="font-size:13px;margin-top:8px"></div>
   </div>
   <div id="znList"></div>
+
+  <div class="eyebrow">Kapasitas kavling</div>
+  <div class="hint">Kavling tanpa kapasitas tidak bisa menerima Putaway dan membuat angka occupancy tidak akurat. Isi sekaligus satu block di sini.</div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <div><label>Block</label><select id="kgBlock"></select></div>
+      <div><label>Kapasitas/kavling (box)</label><input id="kgVal" inputmode="numeric" placeholder="100"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-family:inherit;font-size:13px;margin-bottom:12px;color:var(--ink)"><input type="checkbox" id="kgOnlyEmpty" checked style="width:18px;height:18px">Hanya isi kavling yang masih kosong kapasitasnya</label>
+    <button class="btn" id="kgSave">Terapkan ke seluruh kavling di block ini</button>
+    <div id="kgMsg" style="font-size:13px;margin-top:8px"></div>
+  </div>
+  <div id="kgList"></div>
 
   <div class="eyebrow">Klasifikasi material ke ukuran</div>
   <div class="hint">Pilih beberapa material sekaligus, lalu tetapkan kategori ukuran. Material baru dari SAP yang belum dikategorikan akan ditandai dan tidak dapat diproses Putaway sampai kategorinya ditentukan.</div>
@@ -636,6 +671,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 <section class="screen" id="s-more"><div class="wrap">
   <div class="eyebrow">Menu lainnya</div>
   <div class="card" style="padding:4px 14px">
+    <div class="lrow" style="cursor:pointer" onclick="go('staging')"><div class="g"><div class="t">🅿️ Staging & Dispatch</div><div class="s">Setup staging, monitor picked stock, dispatch & revisi</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('access')"><div class="g"><div class="t">🔐 Akses Saya</div><div class="s">Role, kewenangan & batas approval</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('sap')"><div class="g"><div class="t">Upload Stock SAP</div><div class="s">Sumber semua stock awal</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('oparsip')"><div class="g"><div class="t">Arsip Opname</div><div class="s">Riwayat + Excel/PDF</div></div><div class="n muted">›</div></div>
@@ -1674,8 +1710,13 @@ async function runImport(){
   }catch(e){ b.disabled=false; b.textContent='Coba lagi';
     out.insertAdjacentHTML('afterbegin',`<div class="card" style="border-color:#EFC4C0;background:var(--stop-bg)">Gagal: ${esc(e.message)}</div>`); }
 }
-// ================= TUGAS PICKING (draft → revisi → eksekusi) =================
+// ================= TUGAS PICKING REV.10 =================
 let CUR_TASK=null;
+function taskPill(status){
+  if(['DISPATCHED','STAGED','SELESAI'].includes(status)) return 'p-ok';
+  if(['CANCELLED','BATAL','PARTIAL','HOLD_STAGING'].includes(status)) return 'p-stop';
+  return 'p-warn';
+}
 async function loadTasks(){
   const el=document.getElementById('taskOut');
   el.innerHTML='<div class="card muted">⏳ Memuat…</div>';
@@ -1684,117 +1725,202 @@ async function loadTasks(){
     el.innerHTML = rows.length
       ? `<div class="card" style="padding:4px 14px">`+rows.map(r=>`
         <div class="lrow" style="cursor:pointer" onclick="openTask(${r.id})">
-        <div class="g"><div class="t">${esc(r.filename||'RK')}</div>
-        <div class="s">${esc(r.waktu)} · ${fmt(r.baris)} baris · ${fmt(r.total_qty)} box${r.bermasalah?' · '+fmt(r.bermasalah)+' bermasalah':''}</div></div>
-        <span class="pill ${r.status==='SELESAI'?'p-ok':r.status==='BATAL'?'p-stop':r.status==='PARTIAL'?'p-stop':'p-warn'}">${esc(r.status)}</span></div>`).join('')+`</div>`
+          <div class="g"><div class="t">${esc(r.filename||'RK')}</div>
+          <div class="s">${esc(r.waktu)} · ${fmt(r.baris)} baris · ${fmt(r.total_qty)} box
+          ${r.flow_version==='REV10'?' · REV10':''}${Number(r.staged_qty||0)>0?' · '+fmt(r.staged_qty)+' staged':''}</div></div>
+          <span class="pill ${taskPill(r.status)}">${esc(r.status)}</span>
+        </div>`).join('')+`</div>`
       : `<div class="card muted">Belum ada tugas picking.</div>`;
   }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
 }
+
 async function openTask(id){
   CUR_TASK=id; go('task');
   const el=document.getElementById('taskDetail');
   el.innerHTML='<div class="card muted">⏳ Memuat…</div>';
   try{
-    const [lines,list]=await Promise.all([rpc('wms_pick_task_lines',{p_task:id}),rpc('wms_pick_task_list',{p_rdc:RDC})]);
+    const [lines,list,staging]=await Promise.all([
+      rpc('wms_pick_task_lines',{p_task:id}),
+      rpc('wms_pick_task_list',{p_rdc:RDC}),
+      rpc('wms_staging_options',{p_rdc:RDC}).catch(()=>[])
+    ]);
     const info=list.find(x=>x.id===id)||{};
-    const editable = info.status==='DRAFT';
-    const retryable = info.status==='PARTIAL';
+    const rev10=info.flow_version==='REV10';
+    const editable=info.status==='DRAFT';
+    const retryable=info.status==='PARTIAL';
+    const staged=['STAGED','HOLD_STAGING'].includes(info.status);
     const byTruck={};
     lines.forEach(l=>{(byTruck[l.truck||'-']=byTruck[l.truck||'-']||[]).push(l);});
+
     let h=`<div class="card" style="display:flex;align-items:center;gap:8px;padding:11px 14px">
-      <div style="flex:1"><div style="font-weight:650;font-size:13.5px">${esc(info.filename||'RK')}</div>
-      <div class="muted" style="font-size:12px">${fmt(lines.length)} baris · ${esc(info.waktu||'')}</div></div>
-      <span class="pill ${info.status==='SELESAI'?'p-ok':info.status==='BATAL'?'p-stop':info.status==='PARTIAL'?'p-stop':'p-warn'}">${esc(info.status||'')}</span></div>`;
-    if(editable) h+=`<div class="hint" style="border-color:#EBD5A3;background:var(--warn-bg)"><b>⚠ Stock BELUM dipotong.</b> Tombol <b>Simpan Qty</b> hanya menyimpan revisi angka. Stock baru berkurang setelah tombol <b>Eksekusi & Potong Stock</b> berhasil.</div>`;
-    if(info.status==='PARTIAL') h+=`<div class="hint" style="border-color:#EFC4C0;background:var(--stop-bg)"><b>⚠ Eksekusi sebagian.</b> Sebagian baris sudah memotong stock, sebagian gagal. Sistem hanya akan mencoba ulang baris yang belum selesai.</div>`;
-    Object.keys(byTruck).forEach(t=>{
-      h+=`<div class="truck"><span class="plate">${esc(t)}</span><span class="cnt">${byTruck[t].length} baris</span></div>`;
-      byTruck[t].forEach(l=>{
+      <div style="flex:1"><div style="font-weight:700;font-size:13.5px">${esc(info.filename||'RK')}</div>
+      <div class="muted" style="font-size:12px">${fmt(lines.length)} baris · ${esc(info.waktu||'')} ${rev10?'· REV.10':''}</div></div>
+      <span class="pill ${taskPill(info.status)}">${esc(info.status||'')}</span></div>`;
+
+    if(rev10){
+      h+=`<div class="hint" style="border-color:#C6DEDF;background:var(--field-blue-soft)"><b>REV.10 Flow:</b> Eksekusi Picking memindahkan stock dari STORAGE ke STAGING. Stock belum keluar dari WMS sampai <b>Dispatch Confirm</b>.</div>`;
+    }else{
+      h+=`<div class="hint">Task legacy. History lama tetap memakai flow Stock Out lama dan tidak diubah.</div>`;
+    }
+
+    if(editable && rev10){
+      if(staging.length){
+        h+=`<div class="card"><label>Lokasi Staging Tujuan</label>
+          <select id="taskStaging">${staging.map(s=>`<option value="${s.kavling_id}">${esc(s.location_code)} · terisi ${fmt(s.terisi)} / ${fmt(s.kapasitas||0)}</option>`).join('')}</select>
+          <div class="muted" style="font-size:11.5px;margin-top:5px">Barang hasil picking akan tercatat secara fisik di lokasi staging ini.</div></div>`;
+      }else{
+        h+=`<div class="denied">Belum ada lokasi STAGING aktif. RDC Manager harus menentukan staging lebih dulu.<button class="btn ghost" style="margin-top:8px" onclick="go('staging')">Setup Staging</button></div>`;
+      }
+    }
+
+    Object.keys(byTruck).forEach(truck=>{
+      h+=`<div class="truck"><span class="plate">${esc(truck)}</span><span class="cnt">${byTruck[truck].length} baris</span></div>`;
+      byTruck[truck].forEach(l=>{
         const bad=l.status!=='OK';
+        const lifecycle = Number(l.dispatched_qty||0)>0 ? 'DISPATCHED'
+          : Number(l.excess_qty||0)>0 ? 'EXCESS STAGING'
+          : Number(l.hold_qty||0)>0 ? 'HOLD STAGING'
+          : Number(l.staged_qty||0)>0 ? 'PICKED / STAGING'
+          : 'AVAILABLE / PLANNED';
         h+=`<div class="ticket ${bad?(l.status==='KURANG'?'warn':'stop'):''}">
           <div class="tk-top"><div class="m">
             <div class="tk-mat">${esc(l.motif||l.material_code)}</div>
             <div class="tk-desc">${esc(l.material_code)}${l.batch?' · Seri '+esc(l.batch):''}${l.so_no?' · SO '+esc(l.so_no):''}</div>
-          </div><div class="tk-qty"><b>${fmt(l.qty_requested)}</b><span>DIMINTA</span></div></div>
+          </div><div class="tk-qty"><b>${fmt(l.qty_requested)}</b><span>RK</span></div></div>
           <div class="tk-strip">
-            ${l.location_code?`<div class="stepline"><div style="flex:1">
-              <div class="loc">${esc(l.gudang)} · ${esc(l.block)} · ${esc(l.kavling)}</div>
-              <div style="font-size:10.5px;color:var(--muted);font-family:var(--mono)">${esc(l.location_code)}</div></div></div>`
-              :`<div class="muted" style="font-size:12.5px">Belum ada lokasi</div>`}
-            <div style="display:flex;gap:8px;align-items:flex-end;margin-top:8px">
-              <div style="flex:1"><label>Qty ambil</label>
-                <input inputmode="numeric" value="${l.qty_pick??''}" id="ln_${l.id}" ${editable?'':'disabled'}
-                  style="padding:9px;font-family:var(--mono);text-align:right"></div>
-              ${editable?`<button class="btn" style="flex:0 0 auto;width:auto;padding:10px 14px" onclick="saveLine(${l.id},this)">Simpan Qty</button>`:''}
+            ${l.location_code?`<div class="stepline"><div style="flex:1"><div class="loc">Sumber: ${esc(l.location_code)}</div></div></div>`:''}
+            ${l.staging_location?`<div style="font-size:12px;margin-top:5px"><b>Staging:</b> ${esc(l.staging_location)}</div>`:''}
+            <div style="font-size:11.5px;margin-top:5px"><span class="pill ${lifecycle==='DISPATCHED'?'p-ok':lifecycle.includes('EXCESS')||lifecycle.includes('HOLD')?'p-stop':'p-warn'}">${lifecycle}</span></div>
+            <div class="row" style="margin-top:8px">
+              <div><label>Qty Ambil</label><input inputmode="numeric" value="${l.qty_pick??''}" id="ln_${l.id}" ${editable?'':'disabled'} style="padding:9px;text-align:right"></div>
+              ${editable?`<div style="display:flex;align-items:flex-end"><button class="btn" onclick="saveLine(${l.id},this)">Simpan Qty</button></div>`:''}
             </div>
-            ${l.done?'<div style="font-size:12px;margin-top:7px;color:var(--ok);font-weight:700">✅ STOCK SUDAH DIPOTONG</div>':'<div style="font-size:12px;margin-top:7px;color:var(--warn);font-weight:650">⏳ Stock belum dipotong</div>'}
-          </div>
-          ${l.catatan?`<div class="tk-note">${esc(l.catatan)}</div>`:''}</div>`;
+            ${rev10 && info.status!=='DISPATCHED'?`<button class="btn ghost" style="margin-top:8px" onclick="quickRevLine(${l.id},${Number(l.qty_requested||0)})">✏ Revisi Qty / Cancel Item</button>`:''}
+            ${Number(l.staged_qty||0)>0?`<div class="muted" style="font-size:11.5px;margin-top:6px">Staged ${fmt(l.staged_qty)} · Dispatch ${fmt(l.dispatched_qty||0)} · Excess ${fmt(l.excess_qty||0)} · Hold ${fmt(l.hold_qty||0)}</div>`:''}
+          </div></div>`;
       });
     });
+
     if(editable){
-      h+=`<div style="height:8px"></div>
-        <button class="btn brand" id="execTaskBtn" onclick="execTask(${id},this)">Eksekusi & Potong Stock</button>
-        <button class="btn ghost" style="margin-top:8px" onclick="cancelTask(${id})">Batalkan tugas</button>`;
+      if(rev10){
+        h+=`<div style="height:8px"></div>
+          <button class="btn brand" id="execTaskBtn" ${staging.length?'':'disabled'} onclick="execTask(${id},this,'REV10')">Eksekusi Picking → Staging</button>
+          <button class="btn ghost" style="margin-top:8px" onclick="cancelTask(${id},'REV10')">Batalkan Task / Truck</button>`;
+      }else{
+        h+=`<div style="height:8px"></div><button class="btn brand" onclick="execTask(${id},this,'LEGACY')">Eksekusi Legacy</button>`;
+      }
     }
-    if(retryable){
-      h+=`<div style="height:8px"></div>
-        <button class="btn brand" id="execTaskBtn" onclick="execTask(${id},this)">Coba Lagi Baris yang Gagal</button>`;
+    if(retryable && rev10){
+      h+=`<button class="btn brand" id="execTaskBtn" onclick="execTask(${id},this,'REV10')">Coba Lagi Baris Gagal → Staging</button>`;
     }
-    if(info.status==='SELESAI'){
-      h+=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg);margin-top:12px;text-align:center">
-        <div style="font-size:26px">✅</div>
-        <div style="font-weight:800;color:var(--ok);margin-top:4px">PICKING SUDAH DIEKSEKUSI</div>
-        <div class="muted" style="font-size:12.5px;margin-top:4px">Stock pada baris di atas sudah dipotong. Tugas ini tidak dapat dieksekusi ulang.</div>
+    if(staged && rev10){
+      h+=`<div class="card" style="border-color:#C6DEDF;background:var(--field-blue-soft);margin-top:12px">
+        <div style="font-weight:750">Barang masih tercatat di WMS pada STAGING.</div>
+        <div class="muted" style="font-size:12px;margin-top:4px">Jika rencana berubah, lakukan Quick Revision/Cancel. Jika kendaraan berangkat, lakukan Dispatch Confirm.</div>
+        <button class="btn brand" style="margin-top:10px" onclick="dispatchTask(${id},this)">🚚 Dispatch Confirm → Stock Out</button>
+        <button class="btn ghost" style="margin-top:8px" onclick="cancelTask(${id},'REV10')">Truck Batal / Hold Staging</button>
       </div>`;
     }
+    if(info.status==='DISPATCHED'){
+      h+=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg);text-align:center">
+        <div style="font-size:26px">🚚✅</div><div style="font-weight:800;color:var(--ok)">DISPATCHED — STOCK SUDAH KELUAR WMS</div>
+        <div class="muted" style="font-size:12px;margin-top:4px">Normal RK Revision tidak boleh mengubah transaksi ini. Gunakan Return/Reversal workflow.</div></div>`;
+    }
     el.innerHTML=h;
-  }catch(e){ el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`; }
+  }catch(e){el.innerHTML=`<div class="card muted">Gagal: ${esc(e.message)}</div>`;}
 }
+
 async function saveLine(id,btn){
-  const input=document.getElementById('ln_'+id);
-  const v=parseFloat(input.value);
+  const input=document.getElementById('ln_'+id),v=parseFloat(input.value);
   if(!isFinite(v)||v<0){alert('Qty tidak valid.');return;}
   if(btn){btn.disabled=true;btn.textContent='⏳ Menyimpan';}
-  input.disabled=true;
   try{
     await rpc('wms_pick_line_edit',{p_line:id,p_qty:v});
-    if(btn){btn.textContent='✓ Qty Tersimpan';btn.style.background='var(--ok)';btn.style.color='#fff';}
-    const note=document.createElement('div');
-    note.style.cssText='font-size:11.5px;color:var(--warn);font-weight:650;margin-top:6px';
-    note.textContent='Qty tersimpan — stock BELUM dipotong. Tekan Eksekusi & Potong Stock untuk final.';
-    btn?.parentElement?.appendChild(note);
-    setTimeout(()=>openTask(CUR_TASK),900);
-  }catch(e){
-    input.disabled=false;
-    if(btn){btn.disabled=false;btn.textContent='Simpan Qty';}
-    alert('Gagal: '+e.message);
-  }
+    if(btn){btn.textContent='✓ Qty Tersimpan';}
+    setTimeout(()=>openTask(CUR_TASK),600);
+  }catch(e){if(btn){btn.disabled=false;btn.textContent='Simpan Qty';}alert('Gagal: '+e.message);}
 }
-async function execTask(id,btn){
-  if(!confirm('EKSEKUSI PICKING & POTONG STOCK SEKARANG?\n\nSimpan Qty saja tidak memotong stock. Tombol ini yang melakukan pengurangan stock aktual.')) return;
-  if(btn){btn.disabled=true;btn.dataset.old=btn.textContent;btn.textContent='⏳ Memotong stock…';}
+
+async function execTask(id,btn,flow){
+  if(flow==='LEGACY'){
+    if(!confirm('Task legacy akan memakai flow lama. Lanjutkan?')) return;
+    try{await rpc('wms_pick_task_execute',{p_task:id});await openTask(id);loadTasks();}catch(e){alert('Gagal: '+e.message);} return;
+  }
+  const stg=parseInt(document.getElementById('taskStaging')?.value||0);
+  if(!stg){alert('Pilih lokasi STAGING terlebih dahulu.');return;}
+  if(!confirm('Eksekusi Picking ke STAGING?\n\nStock belum keluar dari WMS. Stock Out baru saat Dispatch Confirm.')) return;
+  btn.disabled=true;btn.textContent='⏳ Memindahkan ke Staging…';
   try{
-    const r=await rpc('wms_pick_task_execute',{p_task:id});
-    const ok=Number(r.dipotong||0), fail=Number(r.gagal||0);
-    if(r.status==='SELESAI'){
-      alert(`✅ PICKING SELESAI\n${ok} baris berhasil dipotong dari stock.\nTugas dikunci dan tidak dapat dieksekusi ulang.`);
-    }else{
-      alert(`⚠ EKSEKUSI SEBAGIAN\n${ok} baris berhasil dipotong.\n${fail} baris gagal.\nBaris yang sudah berhasil dikunci; hanya baris gagal yang dapat dicoba ulang.`);
-    }
-    await Promise.allSettled([openTask(id),loadHome(),loadStock(),loadTasks()]);
-  }catch(e){
-    if(btn){btn.disabled=false;btn.textContent=btn.dataset.old||'Eksekusi & Potong Stock';}
-    alert('Gagal: '+e.message);
-  }
+    const r=await rpc('wms_pick_task_execute_v10',{p_task:id,p_staging_kavling:stg});
+    alert(`✅ Picking ke Staging selesai\n${r.staged_lines||0} baris berhasil.\nStatus: ${r.status}`);
+    await Promise.allSettled([openTask(id),loadHome(),loadStock(),loadTasks(),loadStaging()]);
+  }catch(e){btn.disabled=false;btn.textContent='Eksekusi Picking → Staging';alert('Gagal: '+e.message);}
 }
-async function cancelTask(id){
-  if(!confirm('Batalkan tugas picking ini? Stock tidak akan dipotong.')) return;
-  try{ await rpc('wms_pick_task_cancel',{p_task:id}); openTask(id); loadTasks(); }
-  catch(e){ alert('Gagal: '+e.message); }
+
+async function dispatchTask(id,btn){
+  if(!confirm('DISPATCH CONFIRM?\n\nIni adalah titik Stock Out. Setelah berhasil, normal RK Revision tidak dapat mengubah barang yang sudah keluar.')) return;
+  btn.disabled=true;btn.textContent='⏳ Dispatch…';
+  try{
+    const r=await rpc('wms_dispatch_confirm',{p_task:id});
+    alert(`🚚 DISPATCHED\n${fmt(r.qty||0)} box keluar dari WMS.`);
+    await Promise.allSettled([openTask(id),loadHome(),loadStock(),loadTasks(),loadStaging()]);
+  }catch(e){btn.disabled=false;btn.textContent='🚚 Dispatch Confirm → Stock Out';alert('Gagal: '+e.message);}
+}
+
+async function quickRevLine(lineId,currentQty){
+  const n=prompt('Qty RK baru untuk item ini.\nIsi 0 untuk Cancel Item.',String(currentQty));
+  if(n===null) return;
+  const q=Number(n); if(!Number.isFinite(q)||q<0){alert('Qty tidak valid.');return;}
+  const reason=prompt('Alasan revisi / perubahan rencana kirim:','')||'Revision';
+  try{
+    const r=await rpc('wms_pick_quick_revision',{p_line:lineId,p_new_qty:q,p_reason:reason});
+    if(r.status==='ADDITIONAL_CREATED') alert(`✅ ADDITIONAL PICKING dibuat ${fmt(r.add_qty)} box.\nTask tambahan #${r.additional_task_id}`);
+    else if(r.status==='REDUCED') alert(`✅ RK dikurangi.\nExcess Staging: ${fmt(r.excess_staging||0)} box.`);
+    else alert('Tidak ada perubahan.');
+    await Promise.allSettled([openTask(CUR_TASK),loadTasks(),loadStaging()]);
+  }catch(e){alert('Revisi gagal: '+e.message);}
+}
+
+async function cancelTask(id,flow='REV10'){
+  if(flow!=='REV10'){
+    if(!confirm('Batalkan task legacy?'))return;
+    try{await rpc('wms_pick_task_cancel',{p_task:id});openTask(id);loadTasks();}catch(e){alert('Gagal: '+e.message);} return;
+  }
+  const reason=prompt('Alasan pembatalan truck/task:','Truck / rencana kirim berubah');
+  if(reason===null)return;
+  try{
+    const r=await rpc('wms_pick_task_cancel_v10',{p_task:id,p_reason:reason});
+    alert(r.status==='HOLD_STAGING'?`Barang yang sudah dipicking masuk HOLD STAGING (${fmt(r.hold_qty)} box).`:'Task dibatalkan sebelum physical movement.');
+    await Promise.allSettled([openTask(id),loadTasks(),loadStaging()]);
+  }catch(e){alert('Gagal: '+e.message);}
 }
 const _go4=go;
-go=function(s){ _go4(s); if(s==='tasks') loadTasks(); };
+go=function(s){_go4(s);if(s==='tasks')loadTasks();if(s==='staging')loadStaging();};
+
+// ================= STAGING SETUP & MONITOR =================
+async function loadStaging(){
+  const sel=document.getElementById('stgLocSel'),active=document.getElementById('stgActive'),tasks=document.getElementById('stgTasks');
+  if(!sel)return;
+  try{
+    const [locs,stg,ts]=await Promise.all([
+      rpc('wms_location_type_options',{p_rdc:RDC}),
+      rpc('wms_staging_options',{p_rdc:RDC}),
+      rpc('wms_pick_task_list',{p_rdc:RDC})
+    ]);
+    sel.innerHTML=(locs||[]).map(x=>`<option value="${x.kavling_id}">${esc(x.location_code)} · ${esc(x.location_type)}${Number(x.stock_qty)>0?' · '+fmt(x.stock_qty)+' box':''}</option>`).join('');
+    active.innerHTML=(stg||[]).length?`<div class="card" style="padding:4px 14px">${stg.map(s=>`<div class="lrow"><div class="g"><div class="t">${esc(s.location_code)}</div><div class="s">${esc(s.gudang)} · ${esc(s.block)}</div></div><div class="n">${fmt(s.terisi)} / ${fmt(s.kapasitas||0)}</div></div>`).join('')}</div>`:'<div class="card muted">Belum ada lokasi STAGING.</div>';
+    const watch=(ts||[]).filter(x=>['STAGED','HOLD_STAGING','PARTIAL'].includes(x.status));
+    tasks.innerHTML=watch.length?`<div class="card" style="padding:4px 14px">${watch.map(x=>`<div class="lrow" style="cursor:pointer" onclick="openTask(${x.id})"><div class="g"><div class="t">${esc(x.filename)}</div><div class="s">${esc(x.status)} · ${fmt(x.staged_qty||0)} staged · ${fmt(x.excess_qty||0)} excess · ${fmt(x.hold_qty||0)} hold</div></div><div class="n muted">›</div></div>`).join('')}</div>`:'<div class="card muted">Tidak ada task menunggu Dispatch/Revisi.</div>';
+  }catch(e){document.getElementById('stgMsg').textContent='Gagal: '+e.message;}
+}
+document.getElementById('stgSet')?.addEventListener('click',async()=>{
+  const id=parseInt(document.getElementById('stgLocSel').value),msg=document.getElementById('stgMsg');
+  try{await rpc('wms_location_type_save',{p_kavling:id,p_type:'STAGING'});msg.style.color='var(--ok)';msg.textContent='✓ Lokasi ditetapkan sebagai STAGING.';loadStaging();}catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}
+});
+document.getElementById('stgUnset')?.addEventListener('click',async()=>{
+  const id=parseInt(document.getElementById('stgLocSel').value),msg=document.getElementById('stgMsg');
+  try{await rpc('wms_location_type_save',{p_kavling:id,p_type:'STORAGE'});msg.style.color='var(--ok)';msg.textContent='✓ Lokasi dikembalikan menjadi STORAGE.';loadStaging();}catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}
+});
 
 // ================= PINDAH LOKASI (TRANSFER) =================
 let TF_LOCS=[], TF_TARGETS=[];
@@ -2285,35 +2411,79 @@ async function refreshZoneCache(){
   ZN_CACHE=zones||[]; ZM_CACHE=map||{};
 }
 async function loadZoneMaster(){
-  const whSel=document.getElementById('znWh'); if(!whSel) return;
   try{
-    const [whs,blocks]=await Promise.all([
-      rpc('wms_warehouse_options',{p_rdc:RDC}).catch(()=>[]),
-      rpc('wms_block_options',{p_rdc:RDC}).catch(()=>[])]);
     await refreshZoneCache();
-    whSel.innerHTML=(whs||[]).map(w=>`<option value="${w.warehouse_id}" data-g="${esc(w.gudang)}">Gudang ${esc(w.gudang)}</option>`).join('');
-    whSel.onchange=()=>renderZoneBlocks(blocks||[]); whSel._blocks=blocks||[]; renderZoneBlocks(blocks||[]);
-    renderZones(); await loadZoneMaterials();
-  }catch(e){ document.getElementById('znMsg').textContent='Gagal memuat zonasi: '+e.message; }
+    renderZones(); await loadCapacityGaps(); await loadZoneMaterials();
+  }catch(e){ const m=document.getElementById('znMsg'); if(m) m.textContent='Gagal memuat kuota: '+e.message; }
 }
-function renderZoneBlocks(blocks){
-  const sel=document.getElementById('znWh'), box=document.getElementById('znBlocks'); if(!sel||!box) return;
-  const gud=sel.options[sel.selectedIndex]?.dataset.g||''; const rows=(blocks||[]).filter(b=>String(b.gudang)===String(gud));
-  box.innerHTML=rows.length?rows.map(b=>`<label style="display:flex;align-items:center;gap:8px;text-transform:none;font-family:inherit;font-size:13px;margin:5px 0;color:var(--ink)"><input type="checkbox" class="znBlk" value="${b.block_id}" data-code="${esc(b.block)}" style="width:18px;height:18px">Block ${esc(b.block)} <span class="muted">(${fmt(b.jml_kavling)} kavling)</span></label>`).join(''):'<div class="muted">Belum ada block pada gudang ini.</div>';
+
+// ---- Kapasitas kavling massal ----
+let KG_CACHE=[];
+async function loadCapacityGaps(){
+  const sel=document.getElementById('kgBlock'), out=document.getElementById('kgList'); if(!sel) return;
+  try{
+    KG_CACHE=await rpc('wms_capacity_gaps',{p_rdc:RDC}).catch(()=>[]);
+    KG_CACHE=KG_CACHE||[];
+    sel.innerHTML=KG_CACHE.length
+      ? KG_CACHE.map(b=>`<option value="${b.block_id}">${esc(b.gudang)} &middot; Block ${esc(b.block)} (${fmt(b.kavling_tanpa_kapasitas)} kosong)</option>`).join('')
+      : '<option value="">Semua kavling sudah ada kapasitas</option>';
+    const total=KG_CACHE.reduce((a,b)=>a+Number(b.kavling_tanpa_kapasitas||0),0);
+    if(out) out.innerHTML = total
+      ? `<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg)"><div style="font-weight:650;color:var(--warn)">${fmt(total)} kavling belum punya kapasitas</div><div class="muted" style="font-size:12px;margin-top:4px">Tersebar di ${fmt(KG_CACHE.length)} block. Putaway ke kavling ini akan ditolak.</div></div>`
+      : '<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)"><div style="font-weight:650;color:var(--ok)">Semua kavling sudah punya kapasitas.</div></div>';
+  }catch(e){ if(out) out.innerHTML=`<div class="card muted">Gagal memuat: ${esc(e.message)}</div>`; }
 }
+document.getElementById('kgSave')?.addEventListener('click',async()=>{
+  const msg=document.getElementById('kgMsg');
+  const bid=Number(document.getElementById('kgBlock').value);
+  const val=Number(document.getElementById('kgVal').value);
+  const onlyEmpty=document.getElementById('kgOnlyEmpty').checked;
+  if(!bid||!isFinite(val)||val<=0){msg.style.color='var(--stop)';msg.textContent='Pilih block dan isi kapasitas.';return;}
+  msg.style.color='var(--muted)';msg.textContent='Menyimpan…';
+  try{
+    const r=await rpc('wms_capacity_bulk_set',{p_rdc:RDC,p_block_id:bid,p_kapasitas:val,p_hanya_yang_kosong:onlyEmpty});
+    msg.style.color='var(--ok)';
+    msg.textContent=`✓ ${fmt(r.kavling_diubah)} kavling diisi ${fmt(r.kapasitas_per_kavling)} box. Kapasitas RDC kini ${fmt(r.kapasitas_rdc_sekarang)} box.`;
+    document.getElementById('kgVal').value='';
+    await loadCapacityGaps(); await refreshZoneCache(); renderZones();
+  }catch(e){ msg.style.color='var(--stop)'; msg.textContent='Gagal: '+e.message; }
+});
 function zoneSizes(){return [...new Set(ZN_CACHE.map(z=>normSize(z.size)).filter(Boolean))].sort();}
+function zoneStatusPill(st){
+  const map={'OVERLOAD':'p-stop','LOW':'p-warn','NORMAL':'p-ok','KUOTA BELUM DIATUR':'p-warn'};
+  return `<span class="pill ${map[st]||'p-warn'}">${esc(st||'-')}</span>`;
+}
 function renderZones(){
-  const rows=ZN_CACHE, out=document.getElementById('znList'); if(!out) return; const grouped={}; rows.forEach(z=>(grouped[z.gudang]=grouped[z.gudang]||[]).push(z));
-  let h=''; Object.keys(grouped).sort().forEach(g=>{const total=grouped[g].reduce((a,z)=>a+Number(z.pct||0),0);h+=`<div class="eyebrow">Gudang ${esc(g)} · alokasi ${total}%</div><div class="card" style="padding:4px 14px">`+grouped[g].map(z=>`<div class="lrow"><div class="g"><div class="t">Zona ${esc(z.size)}</div><div class="s">${Number(z.pct)||0}% luas${z.blocks?.length?' · Block '+z.blocks.map(b=>esc(b.code)).join(', '):' · block belum ditentukan'}${z.note?' · '+esc(z.note):''}</div></div><button class="btn ghost" style="width:auto;padding:6px 10px;font-size:12px" onclick="deleteZone(${z.id})">Hapus</button></div>`).join('')+'</div>';});
-  out.innerHTML=h||'<div class="card muted">Belum ada zonasi ukuran.</div>';
-  const zs=zoneSizes(), sel=document.getElementById('zmSize'); if(sel) sel.innerHTML=zs.length?zs.map(x=>`<option>${esc(x)}</option>`).join(''):'<option value="">Buat zona dahulu</option>';
+  const rows=ZN_CACHE||[], out=document.getElementById('znList'); if(!out) return;
+  const total=rows.reduce((a,z)=>a+Number(z.pct||0),0);
+  let h=`<div class="eyebrow">Alokasi terpakai ${Math.round(total*10)/10}% dari 100%</div>`;
+  if(!rows.length){ out.innerHTML='<div class="card muted">Belum ada kuota ukuran. Tetapkan minimal satu sebelum Putaway bisa dijalankan.</div>'; return; }
+  h+='<div class="card" style="padding:4px 14px">'+rows.map(z=>{
+    const seb=z.sebaran_gudang&&Object.keys(z.sebaran_gudang).length
+      ? Object.entries(z.sebaran_gudang).map(([g,v])=>`${esc(g)}: ${fmt(v)}`).join(' · ')
+      : 'belum ada stock berlokasi';
+    return `<div class="lrow"><div class="g"><div class="t">${esc(z.size)} ${zoneStatusPill(z.status)}</div>`
+      +`<div class="s">${Number(z.pct)||0}% &middot; kuota ${fmt(z.kuota_box)} box &middot; terisi ${fmt(z.terisi_box)} box &middot; sisa ${fmt(z.sisa_box)}</div>`
+      +`<div class="s">${seb}${z.note?' · '+esc(z.note):''}</div></div>`
+      +`<button class="btn ghost" style="width:auto;padding:6px 10px;font-size:12px" onclick="deleteZone(${z.id})">Hapus</button></div>`;
+  }).join('')+'</div>';
+  out.innerHTML=h;
+  const zs=zoneSizes(), sel=document.getElementById('zmSize'); if(sel) sel.innerHTML=zs.length?zs.map(x=>`<option>${esc(x)}</option>`).join(''):'<option value="">Buat kuota ukuran dahulu</option>';
   refreshHomeZoneAlert();
 }
 document.getElementById('znSave')?.addEventListener('click',async()=>{
-  const msg=document.getElementById('znMsg'), wh=document.getElementById('znWh'); const wid=Number(wh.value), size=normSize(document.getElementById('znSize').value), pct=Number(document.getElementById('znPct').value), note=document.getElementById('znNote').value.trim(); const blocks=[...document.querySelectorAll('.znBlk:checked')].map(x=>String(x.value));
-  if(!wid||!size||!isFinite(pct)||pct<=0||!blocks.length){msg.style.color='var(--stop)';msg.textContent='Gudang, ukuran, % luas, dan minimal satu Block wajib diisi.';return;}
+  const msg=document.getElementById('znMsg');
+  const size=document.getElementById('znSize').value.trim();
+  const pct=Number(document.getElementById('znPct').value);
+  const note=document.getElementById('znNote').value.trim();
+  if(!size||!isFinite(pct)||pct<=0){msg.style.color='var(--stop)';msg.textContent='Ukuran dan % kapasitas wajib diisi.';return;}
   msg.style.color='var(--muted)';msg.textContent='Menyimpan ke database…';
-  try{await rpc('wms_zone_save',{p_rdc:RDC,p_warehouse_id:wid,p_ukuran:size,p_persen:pct,p_note:note||null,p_block_ids:blocks,p_id:null}); await refreshZoneCache(); renderZones(); renderZoneMaterials(); msg.style.color='var(--ok)';msg.textContent='✓ Zonasi tersimpan dan berlaku untuk semua user RDC.'; document.getElementById('znSize').value='';document.getElementById('znPct').value='';document.getElementById('znNote').value='';document.querySelectorAll('.znBlk:checked').forEach(x=>x.checked=false);}catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}
+  try{
+    await rpc('wms_zone_save',{p_rdc:RDC,p_warehouse_id:null,p_ukuran:size,p_persen:pct,p_note:note||null,p_block_ids:[],p_id:null});
+    await refreshZoneCache(); renderZones(); renderZoneMaterials();
+    msg.style.color='var(--ok)';msg.textContent='✓ Kuota tersimpan dan berlaku untuk seluruh RDC.';
+    document.getElementById('znSize').value='';document.getElementById('znPct').value='';document.getElementById('znNote').value='';
+  }catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}
 });
 async function deleteZone(id){if(!confirm('Hapus/nonaktifkan zonasi ini?'))return;try{await rpc('wms_zone_delete',{p_id:id});await refreshZoneCache();renderZones();renderZoneMaterials();}catch(e){alert('Gagal: '+e.message);}}
 async function loadZoneMaterials(){
@@ -2326,8 +2496,20 @@ function renderZoneMaterials(){
   out.innerHTML=rows.length?`<div class="card" style="padding:4px 14px">${rows.map(m=>`<div class="lrow"><input type="checkbox" class="zmChk" value="${esc(m.material)}" style="width:18px;height:18px;flex:0 0 auto"><div class="g"><div class="t">${esc(m.material)}</div><div class="s">${esc(m.desc||'')}${m.suggested&&!ZM_CACHE[m.material]?' · saran master: '+esc(m.suggested):''}</div></div><div style="text-align:right">${ZM_CACHE[m.material]?`<span class="pill p-ok">${esc(ZM_CACHE[m.material])}</span>`:'<span class="pill p-warn">BELUM DIATUR</span>'}</div></div>`).join('')}</div>`:'<div class="card muted">Tidak ada material yang cocok.</div>';refreshHomeZoneAlert();
 }
 document.getElementById('zmSearch')?.addEventListener('input',renderZoneMaterials);
-document.getElementById('zmAssign')?.addEventListener('click',async()=>{const msg=document.getElementById('zmMsg'),size=normSize(document.getElementById('zmSize').value),ids=[...document.querySelectorAll('.zmChk:checked')].map(x=>String(x.value).toUpperCase());if(!size){msg.style.color='var(--stop)';msg.textContent='Buat zonasi dahulu.';return;}if(!ids.length){msg.style.color='var(--stop)';msg.textContent='Pilih minimal satu material.';return;}msg.style.color='var(--muted)';msg.textContent='Menyimpan…';try{const r=await rpc('wms_material_size_save',{p_rdc:RDC,p_materials:ids,p_ukuran:size});await refreshZoneCache();msg.style.color='var(--ok)';msg.textContent=`✓ ${r.assigned} material ditetapkan ke ${r.ukuran}.`;renderZoneMaterials();}catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}});
-function refreshHomeZoneAlert(){const el=document.getElementById('homeZoneAlert');if(!el)return;const known=new Set(ZN_MATERIALS.map(m=>m.material)),n=[...known].filter(k=>!ZM_CACHE[k]).length,by={};ZN_CACHE.forEach(z=>(by[z.gudang]=by[z.gudang]||0,by[z.gudang]+=Number(z.pct||0)));const incomplete=Object.entries(by).filter(([g,p])=>p<99.999).map(([g,p])=>`${g} ${p}%`);let parts=[];if(n)parts.push(`${fmt(n)} material belum dikategorikan`);if(incomplete.length)parts.push(`alokasi zonasi belum 100%: ${incomplete.join(', ')}`);el.innerHTML=parts.length?`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg);margin-top:12px"><div style="font-weight:650;color:var(--warn)">Perlu perhatian zonasi ukuran</div><div class="muted" style="font-size:12px;margin-top:4px">${esc(parts.join(' · '))}</div></div>`:'';}
+document.getElementById('zmAssign')?.addEventListener('click',async()=>{const msg=document.getElementById('zmMsg'),size=normSize(document.getElementById('zmSize').value),ids=[...document.querySelectorAll('.zmChk:checked')].map(x=>String(x.value).toUpperCase());if(!size){msg.style.color='var(--stop)';msg.textContent='Buat kuota ukuran dahulu.';return;}if(!ids.length){msg.style.color='var(--stop)';msg.textContent='Pilih minimal satu material.';return;}msg.style.color='var(--muted)';msg.textContent='Menyimpan…';try{const r=await rpc('wms_material_size_save',{p_rdc:RDC,p_materials:ids,p_ukuran:size});await refreshZoneCache();msg.style.color='var(--ok)';msg.textContent=`✓ ${fmt(r.diubah??r.assigned??0)} material ditetapkan ke ${esc(r.ukuran||'')}.`;renderZoneMaterials();}catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}});
+function refreshHomeZoneAlert(){
+  const el=document.getElementById('homeZoneAlert'); if(!el) return;
+  const known=new Set(ZN_MATERIALS.map(m=>m.material));
+  const n=[...known].filter(k=>!ZM_CACHE[k]).length;
+  const total=(ZN_CACHE||[]).reduce((a,z)=>a+Number(z.pct||0),0);
+  const over=(ZN_CACHE||[]).filter(z=>z.status==='OVERLOAD').map(z=>z.size);
+  let parts=[];
+  if(n) parts.push(`${fmt(n)} material belum dikategorikan`);
+  if(!ZN_CACHE||!ZN_CACHE.length) parts.push('kuota ukuran belum ditetapkan — Putaway akan ditolak');
+  else if(total<99.999) parts.push(`alokasi kuota RDC baru ${Math.round(total*10)/10}% dari 100%`);
+  if(over.length) parts.push(`overload: ${over.join(', ')}`);
+  el.innerHTML=parts.length?`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg);margin-top:12px"><div style="font-weight:650;color:var(--warn)">Perlu perhatian kuota ukuran</div><div class="muted" style="font-size:12px;margin-top:4px">${esc(parts.join(' · '))}</div></div>`:'';
+}
 const _goZone=go;go=function(s){_goZone(s);if(s==='zone')loadZoneMaster();};
 
 // ================= OCCUPANCY =================
