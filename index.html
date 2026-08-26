@@ -248,6 +248,8 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
     <div class="rolebadge" id="fieldRole">ROLE</div>
   </div>
 
+  <div id="pendingWork"></div>
+
   <div class="eyebrow">Aksi utama</div>
   <div class="quick-grid">
     <div class="quick primary" data-perm="PUTAWAY" onclick="safeGo('unloc','PUTAWAY')">
@@ -902,11 +904,41 @@ async function loadHome(){
     <div class="kpi"><div class="lbl">Rimpil</div><div class="val">${fmt(d.rimpil_count)} <small>kavling</small></div></div>`;
   const rec=d.recent||[];
   refreshHomeZoneAlert();
+  loadPendingWork();
   document.getElementById('homeRecent').innerHTML = rec.length? rec.map(r=>`
     <div class="lrow"><div class="g"><div class="t">${esc(r.txn_type)}${r.txn_subtype?' · '+esc(r.txn_subtype):''}</div>
     <div class="s">${esc(r.material_code)}${r.batch?' · '+esc(r.batch):''} · ${esc(r.waktu)} · ${esc(r.created_by||'')}</div></div>
     <div class="n">${fmt(r.qty)}</div></div>`).join('')
     : `<div style="padding:14px 0" class="muted">Belum ada transaksi. Mulai dari Putaway atau Picking.</div>`;
+}
+
+// Layar Hari Ini sebelumnya hanya menampilkan STATUS (stock bagus/rusak/kavling).
+// Tidak ada indikator PEKERJAAN, sehingga approval bisa menggantung berhari-hari
+// karena satu-satunya cara menemukannya adalah membuka menu Lainnya satu per satu.
+const URG={mendesak:{c:'var(--stop)',bg:'var(--stop-bg)',b:'#EFC4C0',i:'🔴'},
+           penting:{c:'var(--warn)',bg:'var(--warn-bg)',b:'#EBD5A3',i:'🟡'},
+           normal:{c:'var(--ink)',bg:'#FBFAF8',b:'var(--line)',i:'⚪'}};
+async function loadPendingWork(){
+  const el=document.getElementById('pendingWork'); if(!el) return;
+  try{
+    const rows=await rpc('wms_pending_work',{p_rdc:RDC});
+    if(!rows||!rows.length){
+      el.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg)">
+        <div style="font-weight:700;color:var(--ok)">✓ Tidak ada pekerjaan tertunda</div>
+        <div class="muted" style="font-size:12px;margin-top:3px">Semua tugas dan persetujuan sudah selesai.</div></div>`;
+      return;
+    }
+    const urgent=rows.filter(r=>r.urgensi==='mendesak').length;
+    el.innerHTML=`<div class="eyebrow">Perlu dikerjakan${urgent?` · ${urgent} mendesak`:''}</div>`
+      + rows.map(r=>{
+      const u=URG[r.urgensi]||URG.normal;
+      return `<div class="lrow" style="cursor:pointer;border-left:3px solid ${u.c};padding-left:10px;background:${u.bg};margin-bottom:6px;border-radius:8px"
+                onclick="go('${esc(r.layar)}')">
+        <div class="g"><div class="t">${u.i} ${esc(r.label)}</div>
+        <div class="s">${esc(r.aksi)}</div></div>
+        <div class="n" style="color:${u.c};font-weight:750">${fmt(r.jumlah)}<div class="muted" style="font-size:10px;font-weight:400">${esc(r.satuan)}</div></div>
+      </div>`;}).join('');
+  }catch(e){ el.innerHTML=''; }
 }
 
 // ---------- picking ----------
