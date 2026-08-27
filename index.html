@@ -878,6 +878,10 @@ async function setupRdc(){
     sel.onchange=()=>{RDC=sel.value; loadHome(); loadStock(); loadLoc(); applyRoleUI();};
   }
   await loadHome(); loadStock(); loadLoc(); applyRoleUI();
+  // Header sempat tertahan di "MEMUAT…" karena hdrSub hanya diperbarui di
+  // dalam go(), padahal setelah login layar Home tampil tanpa memanggil go().
+  const hs=document.getElementById('hdrSub');
+  if(hs) hs.textContent=(RDC?RDC.toUpperCase()+' · ':'')+(SUB.home||'');
 }
 
 // ---------- screens ----------
@@ -928,6 +932,8 @@ async function loadPendingWork(){
         <div class="muted" style="font-size:12px;margin-top:3px">Semua tugas dan persetujuan sudah selesai.</div></div>`;
       return;
     }
+    const RANK={mendesak:0,penting:1,normal:2};
+    rows.sort((a,b)=>(RANK[a.urgensi]??9)-(RANK[b.urgensi]??9));
     const urgent=rows.filter(r=>r.urgensi==='mendesak').length;
     el.innerHTML=`<div class="eyebrow">Perlu dikerjakan${urgent?` · ${urgent} mendesak`:''}</div>`
       + rows.map(r=>{
