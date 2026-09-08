@@ -3440,8 +3440,7 @@ document.getElementById('opArPdf').addEventListener('click',()=>{
       <tbody>${rows}</tbody></table>
     <p style="margin-top:24px;font-size:11px">
       Dihitung oleh: ________________ &nbsp;&nbsp; Spv: ________________ &nbsp;&nbsp; Manager: ________________</p>
-  <script src="mobile-roman.js?v=20260908"></script>
-</body></html>`);
+  </body></html>`);
   w.document.close(); setTimeout(()=>w.print(),400);
 });
 const _go9=go;
@@ -3508,4 +3507,5 @@ function renderAccess(){
 const _goAccess=go;
 go=function(s){ _goAccess(s); if(s==='access') renderAccess(); };
 
-</script></body></html>
+</script><script src="mobile-roman.js?v=20260908"></script>
+</body></html>
