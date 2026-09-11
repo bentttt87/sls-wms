@@ -16,8 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Patch searchable material picker
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
           import re
 
@@ -25,55 +26,58 @@ jobs:
           s = p.read_text(encoding='utf-8')
 
           old_html = '''  <div class="eyebrow">Klasifikasi material ke ukuran</div>
-            <div class="hint">Pilih beberapa material sekaligus, lalu tetapkan kategori ukuran. Material baru dari SAP yang belum dikategorikan akan ditandai dan tidak dapat diproses Putaway sampai kategorinya ditentukan.</div>
-            <div class="card">
-              <div class="row" style="margin-bottom:10px">
-                <div><label>Cari material</label><input id="zmSearch" placeholder="kode / motif / deskripsi"></div>
-                <div><label>Set kategori</label><select id="zmSize"></select></div>
-              </div>
-              <button class="btn" id="zmAssign">Tetapkan kategori untuk item terpilih</button>
-              <div id="zmMsg" style="font-size:13px;margin-top:8px"></div>
+          <div class="hint">Pilih beberapa material sekaligus, lalu tetapkan kategori ukuran. Material baru dari SAP yang belum dikategorikan akan ditandai dan tidak dapat diproses Putaway sampai kategorinya ditentukan.</div>
+          <div class="card">
+            <div class="row" style="margin-bottom:10px">
+              <div><label>Cari material</label><input id="zmSearch" placeholder="kode / motif / deskripsi"></div>
+              <div><label>Set kategori</label><select id="zmSize"></select></div>
             </div>
-            <div id="zmAlert"></div>
-            <div id="zmList"></div>'''
+            <button class="btn" id="zmAssign">Tetapkan kategori untuk item terpilih</button>
+            <div id="zmMsg" style="font-size:13px;margin-top:8px"></div>
+          </div>
+          <div id="zmAlert"></div>
+          <div id="zmList"></div>'''
 
-          # Support both original indentation variants.
           if old_html not in s:
               old_html = '''  <div class="eyebrow">Klasifikasi material ke ukuran</div>
-  <div class="hint">Pilih beberapa material sekaligus, lalu tetapkan kategori ukuran. Material baru dari SAP yang belum dikategorikan akan ditandai dan tidak dapat diproses Putaway sampai kategorinya ditentukan.</div>
-  <div class="card">
-    <div class="row" style="margin-bottom:10px">
-      <div><label>Cari material</label><input id="zmSearch" placeholder="kode / motif / deskripsi"></div>
-      <div><label>Set kategori</label><select id="zmSize"></select></div>
-    </div>
-    <button class="btn" id="zmAssign">Tetapkan kategori untuk item terpilih</button>
-    <div id="zmMsg" style="font-size:13px;margin-top:8px"></div>
-  </div>
-  <div id="zmAlert"></div>
-  <div id="zmList"></div>'''
+          <div class="hint">Pilih beberapa material sekaligus, lalu tetapkan kategori ukuran. Material baru dari SAP yang belum dikategorikan akan ditandai dan tidak dapat diproses Putaway sampai kategorinya ditentukan.</div>
+          <div class="card">
+            <div class="row" style="margin-bottom:10px">
+              <div><label>Cari material</label><input id="zmSearch" placeholder="kode / motif / deskripsi"></div>
+              <div><label>Set kategori</label><select id="zmSize"></select></div>
+            </div>
+            <button class="btn" id="zmAssign">Tetapkan kategori untuk item terpilih</button>
+            <div id="zmMsg" style="font-size:13px;margin-top:8px"></div>
+          </div>
+          <div id="zmAlert"></div>
+          <div id="zmList"></div>'''
+
+          # Regex fallback ignores indentation but anchors exact labels/ids.
+          if old_html not in s:
+              m = re.search(r'  <div class="eyebrow">Klasifikasi material ke ukuran</div>\s*<div class="hint">Pilih beberapa material sekaligus, lalu tetapkan kategori ukuran\. Material baru dari SAP yang belum dikategorikan akan ditandai dan tidak dapat diproses Putaway sampai kategorinya ditentukan\.</div>\s*<div class="card">\s*<div class="row" style="margin-bottom:10px">\s*<div><label>Cari material</label><input id="zmSearch" placeholder="kode / motif / deskripsi"></div>\s*<div><label>Set kategori</label><select id="zmSize"></select></div>\s*</div>\s*<button class="btn" id="zmAssign">Tetapkan kategori untuk item terpilih</button>\s*<div id="zmMsg" style="font-size:13px;margin-top:8px"></div>\s*</div>\s*<div id="zmAlert"></div>\s*<div id="zmList"></div>', s)
+              if not m:
+                  raise SystemExit('Material classification HTML block not found; no change made.')
+              old_html = m.group(0)
 
           new_html = '''  <div class="eyebrow">Klasifikasi material ke ukuran</div>
-  <div class="hint">Cari lalu pilih satu atau beberapa material dari daftar WMS, kemudian tetapkan kategori ukuran. Material dari SAP yang belum dikategorikan tidak dapat diproses Putaway sampai kategorinya ditentukan.</div>
-  <div class="card">
-    <div class="row" style="margin-bottom:10px;align-items:flex-start">
-      <div style="position:relative">
-        <label>Pilih material</label>
-        <button type="button" class="btn ghost" id="zmPickerBtn" style="text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px"><span id="zmPickerText">Pilih material...</span><span aria-hidden="true">⌄</span></button>
-        <div id="zmPicker" class="card" style="display:none;position:absolute;left:0;right:0;top:72px;z-index:40;padding:10px;box-shadow:0 12px 30px rgba(20,22,26,.16)">
-          <input id="zmSearch" placeholder="Cari kode / motif / deskripsi" autocomplete="off" style="margin-bottom:8px">
-          <div id="zmList" style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:#fff"></div>
-        </div>
-        <div id="zmSelectedSummary" class="muted" style="font-size:12px;margin-top:6px">Belum ada material dipilih.</div>
-      </div>
-      <div><label>Set kategori</label><select id="zmSize"></select></div>
-    </div>
-    <button class="btn" id="zmAssign" disabled>Tetapkan kategori untuk item terpilih</button>
-    <div id="zmMsg" style="font-size:13px;margin-top:8px"></div>
-  </div>
-  <div id="zmAlert"></div>'''
-
-          if old_html not in s:
-              raise SystemExit('Material classification HTML block not found; no change made.')
+          <div class="hint">Cari lalu pilih satu atau beberapa material dari daftar WMS, kemudian tetapkan kategori ukuran. Material dari SAP yang belum dikategorikan tidak dapat diproses Putaway sampai kategorinya ditentukan.</div>
+          <div class="card">
+            <div class="row" style="margin-bottom:10px;align-items:flex-start">
+              <div style="position:relative">
+                <label>Pilih material</label>
+                <button type="button" class="btn ghost" id="zmPickerBtn" style="text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px"><span id="zmPickerText">Pilih material...</span><span aria-hidden="true">⌄</span></button>
+                <div id="zmPicker" class="card" style="display:none;position:absolute;left:0;right:0;top:72px;z-index:40;padding:10px;box-shadow:0 12px 30px rgba(20,22,26,.16)">
+                  <input id="zmSearch" placeholder="Cari kode / motif / deskripsi" autocomplete="off" style="margin-bottom:8px">
+                  <div id="zmList" style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;background:#fff"></div>
+                </div>
+                <div id="zmSelectedSummary" class="muted" style="font-size:12px;margin-top:6px">Belum ada material dipilih.</div>
+              </div>
+              <div><label>Set kategori</label><select id="zmSize"></select></div>
+            </div>
+            <button class="btn" id="zmAssign" disabled>Tetapkan kategori untuk item terpilih</button>
+            <div id="zmMsg" style="font-size:13px;margin-top:8px"></div>
+          </div>
+          <div id="zmAlert"></div>'''
           s = s.replace(old_html, new_html, 1)
 
           if 'let ZM_SELECTED=new Set();' not in s:
@@ -96,22 +100,22 @@ function renderZoneMaterials(){
   out.innerHTML=rows.length?rows.map(m=>`<label class="lrow" style="padding:10px 12px;cursor:pointer;margin:0;text-transform:none;font-family:inherit;font-size:13px;color:var(--ink)"><input type="checkbox" class="zmChk" value="${esc(m.material)}" ${ZM_SELECTED.has(m.material)?'checked':''} style="width:18px;height:18px;flex:0 0 auto"><div class="g"><div class="t">${esc(m.material)}</div><div class="s">${esc(m.desc||'')}${m.suggested&&!ZM_CACHE[m.material]?' · saran master: '+esc(m.suggested):''}</div></div><div style="text-align:right">${ZM_CACHE[m.material]?`<span class="pill p-ok">${esc(ZM_CACHE[m.material])}</span>`:'<span class="pill p-warn">BELUM DIATUR</span>'}</div></label>`).join(''):(q?`<div class="muted" style="padding:12px"><b>Material “${esc(q)}” tidak ditemukan pada stock WMS saat ini.</b><br>Pastikan data cutoff / Receiving SAP sudah ter-upload, atau gunakan kata kunci lain.</div>`:'<div class="muted" style="padding:12px">Belum ada material pada stock WMS saat ini.</div>');
   updateZoneMaterialPicker();refreshHomeZoneAlert();
 }
-document.getElementById('zmPickerBtn')?.addEventListener('click',()=>{const p=document.getElementById('zmPicker');if(!p)return;const open=p.style.display!=='none';p.style.display=open?'none':'block';if(!open){const s=document.getElementById('zmSearch');setTimeout(()=>s?.focus(),0);renderZoneMaterials();}});
+document.getElementById('zmPickerBtn')?.addEventListener('click',()=>{const p=document.getElementById('zmPicker');if(!p)return;const open=p.style.display!=='none';p.style.display=open?'none':'block';if(!open){const q=document.getElementById('zmSearch');setTimeout(()=>q?.focus(),0);renderZoneMaterials();}});
 document.getElementById('zmSearch')?.addEventListener('input',renderZoneMaterials);
 document.getElementById('zmList')?.addEventListener('change',e=>{const t=e.target;if(!t?.classList?.contains('zmChk'))return;const v=String(t.value||'').toUpperCase();if(t.checked)ZM_SELECTED.add(v);else ZM_SELECTED.delete(v);updateZoneMaterialPicker();});
 document.addEventListener('click',e=>{const p=document.getElementById('zmPicker'),b=document.getElementById('zmPickerBtn');if(!p||p.style.display==='none')return;if(p.contains(e.target)||b?.contains(e.target))return;p.style.display='none';});
 document.getElementById('zmAssign')?.addEventListener('click',async()=>{const msg=document.getElementById('zmMsg'),size=normSize(document.getElementById('zmSize').value),ids=[...ZM_SELECTED];if(!size){msg.style.color='var(--stop)';msg.textContent='Buat kuota ukuran dahulu.';return;}if(!ids.length){msg.style.color='var(--stop)';msg.textContent='Pilih minimal satu material dari dropdown.';return;}msg.style.color='var(--muted)';msg.textContent='Menyimpan…';try{const r=await rpc('wms_material_size_save',{p_rdc:RDC,p_materials:ids,p_ukuran:size});await refreshZoneCache();msg.style.color='var(--ok)';msg.textContent=`✓ ${fmt(r.diubah??r.assigned??0)} material ditetapkan ke ${esc(r.ukuran||'')}.`;ZM_SELECTED.clear();const p=document.getElementById('zmPicker');if(p)p.style.display='none';const q=document.getElementById('zmSearch');if(q)q.value='';renderZoneMaterials();}catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}});
 function refreshHomeZoneAlert(){'''
 
-          pattern = r"function renderZoneMaterials\(\)\{.*?function refreshHomeZoneAlert\(\)\{"
-          s2, n = re.subn(pattern, replacement, s, count=1, flags=re.S)
+          s2, n = re.subn(r"function renderZoneMaterials\(\)\{.*?function refreshHomeZoneAlert\(\)\{", replacement, s, count=1, flags=re.S)
           if n != 1:
               raise SystemExit(f'Material JS block replacement count={n}; no change committed.')
 
           p.write_text(s2, encoding='utf-8')
           print('Material picker updated successfully.')
-
+          PY
       - name: Commit update
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
