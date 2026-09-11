@@ -43,10 +43,16 @@
   window.setTimeout(apply,600);
 })();
 
-// Governance/login/logistics master patch. Kept separate so core WMS transaction code stays stable.
+// Governance/login/logistics master patch. Load the v81 access patch only after v72 is ready.
 (function loadEcosystemV72(){
   const s=document.createElement('script');
   s.src='ecosystem_v72.js?v=20260909';
   s.defer=false;
+  s.onload=()=>{
+    const p=document.createElement('script');
+    p.src='wms_permissions_v81.js?v=20260911';
+    p.defer=false;
+    document.head.appendChild(p);
+  };
   document.head.appendChild(s);
 })();
