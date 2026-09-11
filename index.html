@@ -562,14 +562,20 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <div class="field-title">🔎 Stock On Hand</div><div class="field-sub">Cari material dan lihat posisi stock secara cepat.</div>
   <div class="hint"><b>REV.10:</b> Stock fisik mencakup STORAGE + STAGING. Barang DISPATCHED tidak lagi dihitung sebagai Stock On Hand.</div>
   <div class="row" style="margin-bottom:8px">
-    <div><label>Motif / Kode</label><input id="fMotif" placeholder="mis. Ginza"></div>
-    <div style="max-width:120px"><label>Seri</label><input id="fSeri" placeholder="S12S"></div>
+    <div><label>Material / Motif</label><input id="fMotif" list="dlMaterial" autocomplete="off" placeholder="Ketik atau pilih material"></div>
+    <div style="max-width:180px"><label>Seri</label><input id="fSeri" list="dlSeri" autocomplete="off" placeholder="Semua seri"></div>
   </div>
   <div class="row" style="margin-bottom:8px">
-    <div><label>Gudang</label><input id="fGudang" placeholder="B"></div>
-    <div><label>Block</label><input id="fBlock" placeholder="A"></div>
-    <div><label>Kavling</label><input id="fKav" placeholder="15"></div>
+    <div><label>Gudang</label><input id="fGudang" list="dlGudang" autocomplete="off" placeholder="Semua gudang"></div>
+    <div><label>Block</label><input id="fBlock" list="dlBlock" autocomplete="off" placeholder="Semua block"></div>
+    <div><label>Kavling</label><input id="fKav" list="dlKavling" autocomplete="off" placeholder="Semua kavling"></div>
   </div>
+  <datalist id="dlMaterial"></datalist>
+  <datalist id="dlSeri"></datalist>
+  <datalist id="dlGudang"></datalist>
+  <datalist id="dlBlock"></datalist>
+  <datalist id="dlKavling"></datalist>
+  <div class="hint" id="stFilterHelp" style="margin-bottom:8px">Klik field untuk memilih dari data aktual RDC, atau ketik untuk mencari. Gudang → Block → Kavling saling mengikuti.</div>
   <div class="row" style="margin-bottom:10px">
     <div><label>Status</label><select id="fStatus"><option value="">Semua</option><option value="GOOD">Bagus</option><option value="DAMAGED">Rusak</option><option value="HOLD">Hold</option></select></div>
     <div style="display:flex;align-items:flex-end;gap:8px">
@@ -2807,6 +2813,49 @@ const _go6=go;
 go=function(s){ _go6(s); if(s==='sync') loadSync(); };
 
 // ================= STOCK (filter terpisah + paging + hapus trial) =================
+// ===== STOCK ON HAND SEARCHABLE DROPDOWN / CASCADING FILTER =====
+let ST_FILTER_TIMER=null;
+let ST_FILTER_LOADING=false;
+function fillDatalist(id,items,mapper){
+  const dl=document.getElementById(id); if(!dl)return;
+  dl.innerHTML=(items||[]).map(v=>{
+    const x=mapper?mapper(v):{value:v,label:''};
+    return `<option value="${esc(x.value??'')}"${x.label?` label="${esc(x.label)}"`:''}></option>`;
+  }).join('');
+}
+async function loadStockFilterOptions(){
+  if(ST_FILTER_LOADING)return;
+  ST_FILTER_LOADING=true;
+  try{
+    const motif=(document.getElementById('fMotif')?.value||'').trim();
+    const gudang=(document.getElementById('fGudang')?.value||'').trim();
+    const block=(document.getElementById('fBlock')?.value||'').trim();
+    const d=await rpc('wms_stock_filter_options',{p_rdc:RDC,p_motif:motif,p_gudang:gudang,p_block:block});
+    fillDatalist('dlMaterial',d.materials||[],v=>({value:v.material_code,label:v.description||''}));
+    fillDatalist('dlSeri',d.series||[]);
+    fillDatalist('dlGudang',d.warehouses||[]);
+    fillDatalist('dlBlock',d.blocks||[]);
+    fillDatalist('dlKavling',d.kavlings||[],v=>({value:v.code,label:v.location_code||v.code}));
+    const seri=document.getElementById('fSeri');
+    if(seri && seri.value && (d.series||[]).length && !(d.series||[]).includes(seri.value)) seri.value='';
+  }catch(e){
+    console.warn('Stock filter options:',e?.message||e);
+  }finally{ST_FILTER_LOADING=false;}
+}
+function debounceStockFilters(){
+  clearTimeout(ST_FILTER_TIMER);
+  ST_FILTER_TIMER=setTimeout(loadStockFilterOptions,300);
+}
+(function bindStockFilterUX(){
+  const motif=document.getElementById('fMotif'), seri=document.getElementById('fSeri');
+  const wh=document.getElementById('fGudang'), bl=document.getElementById('fBlock'), kv=document.getElementById('fKav');
+  [motif,seri,wh,bl,kv].forEach(el=>el?.addEventListener('focus',loadStockFilterOptions));
+  motif?.addEventListener('input',debounceStockFilters);
+  motif?.addEventListener('change',()=>{ if(seri)seri.value=''; loadStockFilterOptions(); });
+  wh?.addEventListener('change',()=>{ if(bl)bl.value=''; if(kv)kv.value=''; loadStockFilterOptions(); });
+  bl?.addEventListener('change',()=>{ if(kv)kv.value=''; loadStockFilterOptions(); });
+})();
+
 let ST_PAGE=0, ST_LIMIT=100, ST_TOTAL=0, ST_ROWS=[];
 function stFilters(){
   return {p_rdc:RDC,
@@ -2821,17 +2870,26 @@ function stFilters(){
 document.getElementById('stGo').addEventListener('click',()=>{ST_PAGE=0;loadStock();});
 document.getElementById('stClear').addEventListener('click',()=>{
   ['fMotif','fSeri','fGudang','fBlock','fKav'].forEach(i=>document.getElementById(i).value='');
-  document.getElementById('fStatus').value=''; ST_PAGE=0; loadStock();
+  document.getElementById('fStatus').value=''; ST_PAGE=0; loadStockFilterOptions(); loadStock();
 });
 async function loadStock(){
   const out=document.getElementById('stOut');
   if(!out) return;
   out.innerHTML='<div class="card muted">⏳ Memuat…</div>';
   try{
+    loadStockFilterOptions();
     const d=await rpc('wms_stock_search', stFilters());
     ST_TOTAL=d.total; ST_ROWS=d.rows||[];
+    const af=[
+      document.getElementById('fMotif').value.trim(),
+      document.getElementById('fSeri').value.trim(),
+      document.getElementById('fGudang').value.trim(),
+      document.getElementById('fBlock').value.trim(),
+      document.getElementById('fKav').value.trim(),
+      document.getElementById('fStatus').value
+    ].filter(Boolean);
     document.getElementById('stSummary').innerHTML=
-      `Menampilkan <b>${fmt(Math.min(ST_PAGE*ST_LIMIT+1,ST_TOTAL))}–${fmt(Math.min((ST_PAGE+1)*ST_LIMIT,ST_TOTAL))}</b> dari <b>${fmt(ST_TOTAL)}</b> baris · total <b>${fmt(d.total_qty)}</b> box`;
+      `Menampilkan <b>${fmt(Math.min(ST_PAGE*ST_LIMIT+1,ST_TOTAL))}–${fmt(Math.min((ST_PAGE+1)*ST_LIMIT,ST_TOTAL))}</b> dari <b>${fmt(ST_TOTAL)}</b> baris · total <b>${fmt(d.total_qty)}</b> box${af.length?` · Filter: <b>${af.map(esc).join(' · ')}</b>`:''}`;
     out.innerHTML = ST_ROWS.length
       ? `<div class="card" style="padding:4px 14px">`+ST_ROWS.map(r=>`
         <div class="lrow">
