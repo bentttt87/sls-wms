@@ -23,9 +23,11 @@
       patched.__wmsV81=true;
       normalizeRole=patched;
     }
+
+    const uid=document.getElementById('uid');
+    if(uid) uid.placeholder='OP.JKT.001 / SPV.JKT / STAFF.JKT.001 / MGR.SLS / MASTER.SLS';
   }
 
   patchRoles();
-  // Re-apply after any late runtime injector, without touching transaction logic.
   window.setTimeout(patchRoles,300);
 })();
