@@ -1,4 +1,5 @@
-// WMS SLS v87 — Supervisor may manage RDC zoning/master setup previously limited to RDC Manager.
+// WMS SLS v87.1 — Supervisor may manage RDC zoning/master setup previously limited to RDC Manager.
+// Hotfix: remove global MutationObserver that could re-trigger itself and freeze the browser.
 (function(){
   'use strict';
 
@@ -12,17 +13,22 @@
   }
 
   function replaceManagerOnlyText(root=document){
+    if(!root || typeof document.createTreeWalker!=='function') return;
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
     const targets=[];
     while(walker.nextNode()){
       const n=walker.currentNode;
       const t=n.nodeValue||'';
-      if(/RDC Manager harus membuat Zonasi Ukuran terlebih dahulu/i.test(t) || /RDC Manager \/ MASTER/i.test(t)) targets.push(n);
+      if(t.includes('RDC Manager harus membuat Zonasi Ukuran terlebih dahulu') ||
+         t.includes('Hanya RDC Manager / MASTER')) targets.push(n);
     }
     targets.forEach(n=>{
-      n.nodeValue=(n.nodeValue||'')
-        .replace(/RDC Manager harus membuat Zonasi Ukuran terlebih dahulu/gi,'Supervisor / RDC Manager dapat membuat Zonasi Ukuran terlebih dahulu')
-        .replace(/RDC Manager \/ MASTER/gi,'Supervisor / RDC Manager / MASTER');
+      let t=n.nodeValue||'';
+      t=t.replace(/RDC Manager harus membuat Zonasi Ukuran terlebih dahulu/g,
+        'Supervisor / RDC Manager dapat membuat Zonasi Ukuran terlebih dahulu');
+      t=t.replace(/Hanya RDC Manager \/ MASTER/g,
+        'Supervisor / RDC Manager / MASTER');
+      if(n.nodeValue!==t) n.nodeValue=t;
     });
   }
 
@@ -30,7 +36,8 @@
     document.querySelectorAll('#s-access .lrow').forEach(row=>{
       const t=row.querySelector('.t'), s=row.querySelector('.s');
       if(!t||!s||!/Supervisor/i.test(t.textContent||'')) return;
-      s.textContent='Operasional + approval SPV + Upload & Konfirmasi Penerimaan SAP + Upload Stock SAP Awal + kelola lokasi + Zonasi/Kuota Ukuran + klasifikasi material + kapasitas kavling + master motif/pallet RDC sendiri.';
+      const wanted='Operasional + approval SPV + Upload & Konfirmasi Penerimaan SAP + Upload Stock SAP Awal + kelola lokasi + Zonasi/Kuota Ukuran + klasifikasi material + kapasitas kavling + master motif/pallet RDC sendiri.';
+      if(s.textContent!==wanted) s.textContent=wanted;
     });
   }
 
@@ -43,15 +50,10 @@
     }
   }
 
+  // Apply a few bounded times only. No DOM observer: avoids recursive mutation loops and browser freeze.
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true});
   else apply();
   setTimeout(apply,250);
-  setTimeout(apply,700);
-
-  const obs=new MutationObserver(()=>{
-    replaceManagerOnlyText(document);
-    patchAccessDescription();
-  });
-  const start=()=>{ if(document.body) obs.observe(document.body,{childList:true,subtree:true,characterData:true}); };
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start,{once:true}); else start();
+  setTimeout(apply,900);
+  setTimeout(apply,1800);
 })();
