@@ -2,7 +2,6 @@
 (function syncQuadraRomanBrand(){
   const BRAND_SRC='quadra-roman-logo.svg?v=20260911';
   function apply(){
-    // Login + mobile/header marks.
     document.querySelectorAll('.mark').forEach(m=>{
       m.textContent='';
       m.style.background='#fff';
@@ -18,8 +17,6 @@
       img.style.objectFit='contain';
       m.appendChild(img);
     });
-
-    // Desktop sidebar brand created by the desktop visual layer.
     document.querySelectorAll('.desk-brand img').forEach(img=>{
       img.src=BRAND_SRC;
       img.alt='QUADRA ROMAN';
@@ -29,8 +26,6 @@
       img.style.background='#fff';
       img.style.padding='4px';
     });
-
-    // Any legacy ROMAN image that may be injected by older UI code.
     document.querySelectorAll('img.roman-logo,img[src*="roman-logo"],img[alt="ROMAN"],img[alt="Roman"]').forEach(img=>{
       img.src=BRAND_SRC;
       img.alt='QUADRA ROMAN';
@@ -42,7 +37,7 @@
   window.setTimeout(apply,600);
 })();
 
-// WMS patch chain: ecosystem governance -> permission tiers -> SPV opening/location -> auto document detection -> receiving access -> Master Lokasi detail/capacity -> SPV zonasi access.
+// WMS patch chain: governance -> permissions -> SPV opening/location -> auto document detection -> receiving access -> location detail/capacity -> v88 simplified setup.
 (function loadWmsPatches(){
   const eco=document.createElement('script');
   eco.src='ecosystem_v72.js?v=20260909';
@@ -72,10 +67,10 @@
               p86.src='wms_location_capacity_v86.js?v=20260912';
               p86.defer=false;
               p86.onload=()=>{
-                const p87=document.createElement('script');
-                p87.src='wms_spv_zone_access_v87.js?v=20260912b';
-                p87.defer=false;
-                document.head.appendChild(p87);
+                const p88=document.createElement('script');
+                p88.src='wms_remove_quota_v88.js?v=20260912';
+                p88.defer=false;
+                document.head.appendChild(p88);
               };
               document.head.appendChild(p86);
             };
