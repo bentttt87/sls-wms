@@ -1,0 +1,35 @@
+name: WMS v88 cache bust
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Force latest WMS loader
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          old='mobile-roman.js?v=20260912c'
+          new='mobile-roman.js?v=20260912d'
+          if old in s:
+              p.write_text(s.replace(old,new),encoding='utf-8')
+              print('patched cache key')
+          else:
+              print('cache key already current or source changed')
+          PY
+      - name: Commit only when changed
+        run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Force-load WMS v88 simplified quota flow"
+          git push
