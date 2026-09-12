@@ -39,20 +39,25 @@
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply,{once:true});
   else apply();
-  // Re-apply once after legacy/runtime UI injectors finish.
   window.setTimeout(apply,600);
 })();
 
-// Governance/login/logistics master patch. Load the v81 access patch only after v72 is ready.
-(function loadEcosystemV72(){
-  const s=document.createElement('script');
-  s.src='ecosystem_v72.js?v=20260909';
-  s.defer=false;
-  s.onload=()=>{
-    const p=document.createElement('script');
-    p.src='wms_permissions_v81.js?v=20260911';
-    p.defer=false;
-    document.head.appendChild(p);
+// WMS patch chain: ecosystem governance -> permission tiers -> SPV opening/location access.
+(function loadWmsPatches(){
+  const eco=document.createElement('script');
+  eco.src='ecosystem_v72.js?v=20260909';
+  eco.defer=false;
+  eco.onload=()=>{
+    const p81=document.createElement('script');
+    p81.src='wms_permissions_v81.js?v=20260911';
+    p81.defer=false;
+    p81.onload=()=>{
+      const p82=document.createElement('script');
+      p82.src='wms_spv_opening_v82.js?v=20260912';
+      p82.defer=false;
+      document.head.appendChild(p82);
+    };
+    document.head.appendChild(p81);
   };
-  document.head.appendChild(s);
+  document.head.appendChild(eco);
 })();
