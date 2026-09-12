@@ -42,7 +42,7 @@
   window.setTimeout(apply,600);
 })();
 
-// WMS patch chain: ecosystem governance -> permission tiers -> SPV opening/location -> auto document detection -> receiving access.
+// WMS patch chain: ecosystem governance -> permission tiers -> SPV opening/location -> auto document detection -> receiving access -> Master Lokasi detail.
 (function loadWmsPatches(){
   const eco=document.createElement('script');
   eco.src='ecosystem_v72.js?v=20260909';
@@ -63,6 +63,12 @@
           const p84=document.createElement('script');
           p84.src='wms_receiving_access_v84.js?v=20260912';
           p84.defer=false;
+          p84.onload=()=>{
+            const p85=document.createElement('script');
+            p85.src='wms_location_detail_v85.js?v=20260912';
+            p85.defer=false;
+            document.head.appendChild(p85);
+          };
           document.head.appendChild(p84);
         };
         document.head.appendChild(p83);
