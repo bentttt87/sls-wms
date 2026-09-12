@@ -476,7 +476,7 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
 
   <div class="eyebrow">Kondisi hari ini</div>
   <div class="kpis" id="homeKpis"></div>
-  <div id="homeZoneAlert"></div>
+  <div id="homeZoneAlert" style="display:none"></div>
   <div class="eyebrow">Aktivitas terakhir</div>
   <div class="card" style="padding:4px 14px" id="homeRecent"></div>
 </div></section>
@@ -883,7 +883,6 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
     <div class="lrow" style="cursor:pointer" onclick="go('sap')"><div class="g"><div class="t">Upload Stock SAP</div><div class="s">Sumber semua stock awal</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('oparsip')"><div class="g"><div class="t">Arsip Opname</div><div class="s">Riwayat + Excel/PDF</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('occ')"><div class="g"><div class="t">Occupancy</div><div class="s">Kuota se-RDC · sebaran per gudang</div></div><div class="n muted">›</div></div>
-    <div class="lrow" style="cursor:pointer" onclick="go('zone')"><div class="g"><div class="t">Kuota Ukuran</div><div class="s">Kuota kapasitas per ukuran se-RDC + klasifikasi material</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('kap')"><div class="g"><div class="t">Master Kapasitas</div><div class="s">Max box per ukuran</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('mmotif')"><div class="g"><div class="t">Master Kode Motif</div><div class="s">Motif ditaruh di block mana</div></div><div class="n muted">›</div></div>
     <div class="lrow" style="cursor:pointer" onclick="go('mpallet')"><div class="g"><div class="t">Master Isi Pallet</div><div class="s">Box per pallet</div></div><div class="n muted">›</div></div>
@@ -946,7 +945,6 @@ input:focus,select:focus{outline:2px solid var(--brand);outline-offset:1px;borde
   <button class="desktop-only" data-s="staging" data-perm="PICKING" onclick="go('staging')"><svg viewBox="0 0 24 24"><path d="M3 8h18v11H3z"/><path d="M7 8V5h10v3"/><path d="M8 13h8"/></svg><span>Staging &amp; Dispatch</span></button>
   <button class="desktop-only" data-s="recon" data-perm="RECON" onclick="go('recon')"><svg viewBox="0 0 24 24"><path d="M4 7h12"/><path d="M14 4l3 3-3 3"/><path d="M20 17H8"/><path d="M10 14l-3 3 3 3"/></svg><span>Reconciliation</span></button>
   <button class="desktop-only" data-s="loc" data-perm="LOCATION_MANAGE" onclick="go('loc')"><svg viewBox="0 0 24 24"><path d="M12 21s6-5.5 6-11a6 6 0 1 0-12 0c0 5.5 6 11 6 11Z"/><circle cx="12" cy="10" r="2"/></svg><span>Master Lokasi</span></button>
-  <button class="desktop-only" data-s="zone" data-perm="ZONE_MANAGE" onclick="go('zone')"><svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/></svg><span>Kuota Ukuran</span></button>
   <button data-s="more" onclick="go('more')"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>Lainnya</span></button>
   <div class="desk-sidebar-footer desktop-only"><b>SLS</b>Stronger Supply<br>for a Better Tomorrow</div>
 </nav>
@@ -3339,17 +3337,8 @@ document.getElementById('zmList')?.addEventListener('change',e=>{const t=e.targe
 document.addEventListener('click',e=>{const p=document.getElementById('zmPicker'),b=document.getElementById('zmPickerBtn');if(!p||p.style.display==='none')return;if(p.contains(e.target)||b?.contains(e.target))return;p.style.display='none';});
 document.getElementById('zmAssign')?.addEventListener('click',async()=>{const msg=document.getElementById('zmMsg'),size=normSize(document.getElementById('zmSize').value),ids=[...ZM_SELECTED];if(!size){msg.style.color='var(--stop)';msg.textContent='Buat kuota ukuran dahulu.';return;}if(!ids.length){msg.style.color='var(--stop)';msg.textContent='Pilih minimal satu material dari dropdown.';return;}msg.style.color='var(--muted)';msg.textContent='Menyimpan…';try{const r=await rpc('wms_material_size_save',{p_rdc:RDC,p_materials:ids,p_ukuran:size});await refreshZoneCache();msg.style.color='var(--ok)';msg.textContent=`✓ ${fmt(r.diubah??r.assigned??0)} material ditetapkan ke ${esc(r.ukuran||'')}.`;ZM_SELECTED.clear();const p=document.getElementById('zmPicker');if(p)p.style.display='none';const q=document.getElementById('zmSearch');if(q)q.value='';renderZoneMaterials();}catch(e){msg.style.color='var(--stop)';msg.textContent='Gagal: '+e.message;}});
 function refreshHomeZoneAlert(){
-  const el=document.getElementById('homeZoneAlert'); if(!el) return;
-  const known=new Set(ZN_MATERIALS.map(m=>m.material));
-  const n=[...known].filter(k=>!ZM_CACHE[k]).length;
-  const total=(ZN_CACHE||[]).reduce((a,z)=>a+Number(z.pct||0),0);
-  const over=(ZN_CACHE||[]).filter(z=>z.status==='OVERLOAD').map(z=>z.size);
-  let parts=[];
-  if(n) parts.push(`${fmt(n)} material belum dikategorikan`);
-  if(!ZN_CACHE||!ZN_CACHE.length) parts.push('kuota ukuran belum ditetapkan — Putaway akan ditolak');
-  else if(total<99.999) parts.push(`alokasi kuota RDC baru ${Math.round(total*10)/10}% dari 100%`);
-  if(over.length) parts.push(`overload: ${over.join(', ')}`);
-  el.innerHTML=parts.length?`<div class="card" style="border-color:#EBD5A3;background:var(--warn-bg);margin-top:12px"><div style="font-weight:650;color:var(--warn)">Perlu perhatian kuota ukuran</div><div class="muted" style="font-size:12px;margin-top:4px">${esc(parts.join(' · '))}</div></div>`:'';
+  const el=document.getElementById('homeZoneAlert');
+  if(el){ el.innerHTML=''; el.style.display='none'; }
 }
 const _goZone=go;go=function(s){_goZone(s);if(s==='zone')loadZoneMaster();};
 
