@@ -37,7 +37,7 @@
   window.setTimeout(apply,600);
 })();
 
-// WMS patch chain: governance -> permissions -> SPV opening/location -> auto document detection -> receiving access -> location detail/capacity -> v88 simplified setup.
+// WMS patch chain: governance -> permissions -> SPV opening/location -> auto document detection -> receiving access -> location detail/capacity -> v89 quota-lock cleanup.
 (function loadWmsPatches(){
   const eco=document.createElement('script');
   eco.src='ecosystem_v72.js?v=20260909';
@@ -67,10 +67,10 @@
               p86.src='wms_location_capacity_v86.js?v=20260912';
               p86.defer=false;
               p86.onload=()=>{
-                const p88=document.createElement('script');
-                p88.src='wms_remove_quota_v88.js?v=20260912';
-                p88.defer=false;
-                document.head.appendChild(p88);
+                const p89=document.createElement('script');
+                p89.src='wms_remove_quota_v88.js?v=20260912b';
+                p89.defer=false;
+                document.head.appendChild(p89);
               };
               document.head.appendChild(p86);
             };
