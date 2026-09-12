@@ -1,0 +1,35 @@
+name: WMS v90 cache bust
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Force latest WMS loader
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          n,c=re.subn(r'mobile-roman\.js\?v=[^"\']+', 'mobile-roman.js?v=20260912g', s)
+          if c:
+              p.write_text(n,encoding='utf-8')
+              print('patched cache key',c)
+          else:
+              print('loader reference not found')
+          PY
+      - name: Commit only when changed
+        run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Force-load WMS v90 quota cleanup"
+          git push
