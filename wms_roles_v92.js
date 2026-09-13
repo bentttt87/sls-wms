@@ -1,4 +1,4 @@
-// WMS SLS v92 — authoritative account model: MASTER, SUPERVISOR, ADMIN, STAFF, MANAGEMENT(view only).
+// WMS SLS v93 — authoritative account model: MASTER, SUPERVISOR, ADMIN, STAFF, MANAGEMENT (national view only).
 (function(){
   'use strict';
 
@@ -18,23 +18,22 @@
       ROLE_PERMS.admin=uniq([...operatorBase,'SAP_UPLOAD','RECON']);
       ROLE_PERMS.staff=uniq(staffBase);
       ROLE_PERMS.management=['STOCK_VIEW'];
-      // Supervisor remains the highest RDC operational/approval tier.
       ROLE_PERMS.supervisor=uniq([...(ROLE_PERMS.supervisor||[]),'LOCATION_MANAGE','SPV_APPROVE','RDC_APPROVE']);
     }
 
-    if(typeof normalizeRole==='function' && !normalizeRole.__wmsV92){
+    if(typeof normalizeRole==='function' && !normalizeRole.__wmsV93){
       const base=normalizeRole;
       const fn=function(r){
         const x=String(r||'').toLowerCase().trim();
         if(['master','supervisor','admin','staff','management'].includes(x)) return x;
         return base(r);
       };
-      fn.__wmsV92=true;
+      fn.__wmsV93=true;
       normalizeRole=fn;
     }
 
     const uid=document.getElementById('uid');
-    if(uid) uid.placeholder='ADMIN.JKT / SPV.JKT / STAFF.JKT.001 / MANAGEMENT.JKT / MASTER.SLS';
+    if(uid) uid.placeholder='ADMIN.JKT / SPV.JKT / STAFF.JKT.001 / MANAGEMENT.SLS / MASTER.SLS';
   }
 
   function isManagement(){
@@ -43,7 +42,7 @@
 
   function applyManagementView(){
     if(!isManagement()) return;
-    // MANAGEMENT is view-only: Dashboard + Stock only.
+    // National management account: choose any RDC, but no transactional action.
     document.querySelectorAll('nav.nav button[data-s]').forEach(btn=>{
       const s=btn.getAttribute('data-s');
       btn.style.display=(s==='home'||s==='stock')?'':'none';
@@ -52,18 +51,22 @@
       const t=(card.textContent||'').toLowerCase();
       card.style.display=t.includes('cari stock')?'':'none';
     });
+    const pending=document.getElementById('pendingWork');
+    if(pending) pending.style.display='none';
     const roleEl=document.getElementById('whoRole');
-    if(roleEl) roleEl.textContent='MANAGEMENT · VIEW ONLY';
+    if(roleEl) roleEl.textContent='MANAGEMENT · ALL RDC · VIEW ONLY';
+    const wrap=document.getElementById('rdcPickWrap');
+    if(wrap) wrap.style.display='block';
   }
 
   function patchNavigation(){
-    if(typeof go!=='function' || go.__wmsV92) return;
+    if(typeof go!=='function' || go.__wmsV93) return;
     const base=go;
     const fn=function(s){
       if(isManagement() && !['home','stock'].includes(String(s))) return base('home');
       return base(s);
     };
-    fn.__wmsV92=true;
+    fn.__wmsV93=true;
     go=fn;
   }
 
