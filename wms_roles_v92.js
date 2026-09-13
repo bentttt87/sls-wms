@@ -1,4 +1,4 @@
-// WMS SLS v93 — authoritative account model: MASTER, SUPERVISOR, ADMIN, STAFF, MANAGEMENT (national view only).
+// WMS SLS v94 — authoritative account model: MASTER, SUPERVISOR, ADMIN, STAFF, MANAGEMENT (national view only).
 (function(){
   'use strict';
 
@@ -15,20 +15,28 @@
       const uniq=a=>[...new Set((a||[]).filter(Boolean))];
       const operatorBase=ROLE_PERMS.operator||['STOCK_VIEW','PUTAWAY','PICKING','TRANSFER','DAMAGE','OPNAME'];
       const staffBase=ROLE_PERMS.warehouse_staff||['STOCK_VIEW','OPNAME'];
-      ROLE_PERMS.admin=uniq([...operatorBase,'SAP_UPLOAD','RECON']);
+
+      // ADMIN = daily warehouse execution + receiving upload/confirm only.
+      // Opening Stock SAP, Reconciliation, Master Location and approvals remain Supervisor/Master.
+      ROLE_PERMS.admin=uniq(operatorBase);
       ROLE_PERMS.staff=uniq(staffBase);
       ROLE_PERMS.management=['STOCK_VIEW'];
-      ROLE_PERMS.supervisor=uniq([...(ROLE_PERMS.supervisor||[]),'LOCATION_MANAGE','SPV_APPROVE','RDC_APPROVE']);
+
+      // SUPERVISOR = highest RDC operational/approval tier.
+      ROLE_PERMS.supervisor=uniq([
+        ...(ROLE_PERMS.supervisor||[]),
+        'LOCATION_MANAGE','SAP_UPLOAD','RECON','SPV_APPROVE','RDC_APPROVE'
+      ]);
     }
 
-    if(typeof normalizeRole==='function' && !normalizeRole.__wmsV93){
+    if(typeof normalizeRole==='function' && !normalizeRole.__wmsV94){
       const base=normalizeRole;
       const fn=function(r){
         const x=String(r||'').toLowerCase().trim();
         if(['master','supervisor','admin','staff','management'].includes(x)) return x;
         return base(r);
       };
-      fn.__wmsV93=true;
+      fn.__wmsV94=true;
       normalizeRole=fn;
     }
 
@@ -60,13 +68,13 @@
   }
 
   function patchNavigation(){
-    if(typeof go!=='function' || go.__wmsV93) return;
+    if(typeof go!=='function' || go.__wmsV94) return;
     const base=go;
     const fn=function(s){
       if(isManagement() && !['home','stock'].includes(String(s))) return base('home');
       return base(s);
     };
-    fn.__wmsV93=true;
+    fn.__wmsV94=true;
     go=fn;
   }
 
