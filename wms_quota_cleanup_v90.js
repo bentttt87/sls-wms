@@ -1,5 +1,5 @@
 // WMS SLS v98 — compatibility cleanup for retired size quota/zoning UI.
-// No MutationObserver: all active operational logic is handled by physical-capacity flow.
+// Lightweight timed cleanup only; physical-capacity flow is authoritative.
 (function(){
   'use strict';
   function ensureStyle(){
