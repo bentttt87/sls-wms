@@ -1,0 +1,51 @@
+name: WMS no-size v98
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply v98 cleanup
+        run: python .github/patch_no_size_v98.py
+      - name: Static JavaScript smoke
+        run: |
+          node --check mobile-roman.js
+          node --check wms_remove_quota_v88.js
+          node --check wms_quota_cleanup_v90.js
+          node --check wms_receiving_autodoc_v83.js
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          idx=Path('index.html').read_text(encoding='utf-8')
+          assert 'mobile-roman.js?v=20260914c' in idx
+          assert 'wms_receiving_autodoc_v83.js?v=20260914c' in Path('mobile-roman.js').read_text(encoding='utf-8')
+          assert 'wms_remove_quota_v88.js?v=20260914c' in Path('mobile-roman.js').read_text(encoding='utf-8')
+          assert 'wms_quota_cleanup_v90.js?v=20260914c' in Path('mobile-roman.js').read_text(encoding='utf-8')
+          assert 'UKURAN BELUM DIISI' not in Path('wms_remove_quota_v88.js').read_text(encoding='utf-8')
+          assert 'Belum Kategori' not in Path('wms_receiving_autodoc_v83.js').read_text(encoding='utf-8')
+          assert 'MutationObserver' not in Path('wms_quota_cleanup_v90.js').read_text(encoding='utf-8')
+          blocks=[]
+          for m in re.finditer(r'<script(?P<attrs>[^>]*)>(?P<body>.*?)</script>',idx,re.I|re.S):
+              if 'src=' in (m.group('attrs') or '').lower(): continue
+              body=m.group('body') or ''
+              if body.strip(): blocks.append(body)
+          for i,body in enumerate(blocks,1):
+              p=Path('/tmp')/f'wms_inline_v98_{i}.js'; p.write_text(body,encoding='utf-8')
+              subprocess.run(['node','--check',str(p)],check=True)
+          print('inline blocks checked',len(blocks))
+          PY
+      - name: Commit cleanup
+        run: |
+          if git diff --quiet -- index.html wms_receiving_autodoc_v83.js; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html wms_receiving_autodoc_v83.js
+          git commit -m "Remove size zoning remnants from Receiving and reload v98"
+          git push
