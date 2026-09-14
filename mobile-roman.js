@@ -1,26 +1,27 @@
-// WMS SLS v94 — larger stacked QUADRA above ROMAN for mobile + desktop.
+// WMS SLS v95 — larger stacked QUADRA above ROMAN for better visual proportion.
 (function syncQuadraRomanBrand(){
-  const SRC='quadra-roman-logo.svg?v=20260914-2200';
+  const SRC='quadra-roman-logo.svg?v=20260914-2210';
   function stack(width){
-    const topW=width, botW=Math.round(width*0.72);
+    const topW=width, botW=Math.round(width*0.78);
     const wrap=document.createElement('div');
-    wrap.className='brand-stack-v94';
-    wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;border-radius:9px;padding:5px 6px;gap:2px;overflow:hidden;flex:0 0 auto;';
-    wrap.style.width=(width+12)+'px';
-    wrap.innerHTML=`<svg viewBox="0 0 250 110" width="${topW}" height="${Math.round(topW*0.44)}" aria-label="QUADRA"><image href="${SRC}" width="420" height="110"/></svg><svg viewBox="280 0 140 110" width="${botW}" height="${Math.round(botW*0.78)}" aria-label="ROMAN"><image href="${SRC}" width="420" height="110"/></svg>`;
+    wrap.className='brand-stack-v95';
+    wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;border-radius:10px;padding:8px 10px;gap:3px;overflow:hidden;flex:0 0 auto;box-shadow:0 2px 8px rgba(0,0,0,.10);';
+    wrap.style.width=(width+22)+'px';
+    wrap.innerHTML=`<svg viewBox="0 0 250 110" width="${topW}" height="${Math.round(topW*0.44)}" aria-label="QUADRA"><image href="${SRC}" width="420" height="110"/></svg><svg viewBox="270 0 150 110" width="${botW}" height="${Math.round(botW*0.72)}" aria-label="ROMAN"><image href="${SRC}" width="420" height="110"/></svg>`;
     return wrap;
   }
   function apply(){
     document.querySelectorAll('.mark').forEach(m=>{
       m.innerHTML='';m.style.cssText+=';background:transparent;padding:0;width:auto;height:auto;border-radius:0;overflow:visible;';
-      m.appendChild(stack(92));
+      m.appendChild(stack(118));
     });
     document.querySelectorAll('.desk-brand').forEach(b=>{
-      b.querySelectorAll('img,.brand-stack-v94').forEach(x=>x.remove());
-      b.insertBefore(stack(145),b.firstChild);
+      b.querySelectorAll('img,.brand-stack-v94,.brand-stack-v95').forEach(x=>x.remove());
+      b.style.alignItems='center';
+      b.insertBefore(stack(188),b.firstChild);
     });
     document.querySelectorAll('img.roman-logo,img[src*="roman-logo"],img[alt="ROMAN"],img[alt="Roman"]').forEach(img=>{
-      const s=stack(img.closest('.desk-brand')?145:92);img.replaceWith(s);
+      const s=stack(img.closest('.desk-brand')?188:118);img.replaceWith(s);
     });
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
