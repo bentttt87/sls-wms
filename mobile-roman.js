@@ -1,14 +1,27 @@
-// WMS SLS v93 — exact user-approved QUADRA + ROMAN branding for mobile + desktop.
+// WMS SLS v94 — larger stacked QUADRA above ROMAN for mobile + desktop.
 (function syncQuadraRomanBrand(){
-  const BRAND_SRC='quadra-roman-logo.svg?v=20260914-2045';
+  const SRC='quadra-roman-logo.svg?v=20260914-2200';
+  function stack(width){
+    const topW=width, botW=Math.round(width*0.72);
+    const wrap=document.createElement('div');
+    wrap.className='brand-stack-v94';
+    wrap.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;border-radius:9px;padding:5px 6px;gap:2px;overflow:hidden;flex:0 0 auto;';
+    wrap.style.width=(width+12)+'px';
+    wrap.innerHTML=`<svg viewBox="0 0 250 110" width="${topW}" height="${Math.round(topW*0.44)}" aria-label="QUADRA"><image href="${SRC}" width="420" height="110"/></svg><svg viewBox="280 0 140 110" width="${botW}" height="${Math.round(botW*0.78)}" aria-label="ROMAN"><image href="${SRC}" width="420" height="110"/></svg>`;
+    return wrap;
+  }
   function apply(){
     document.querySelectorAll('.mark').forEach(m=>{
-      m.textContent='';
-      m.style.background='#fff';m.style.padding='3px 6px';m.style.width='92px';m.style.height='44px';m.style.borderRadius='8px';m.style.overflow='hidden';
-      const img=document.createElement('img');img.src=BRAND_SRC;img.alt='QUADRA + ROMAN';img.style.width='100%';img.style.height='100%';img.style.objectFit='contain';img.style.objectPosition='center';m.appendChild(img);
+      m.innerHTML='';m.style.cssText+=';background:transparent;padding:0;width:auto;height:auto;border-radius:0;overflow:visible;';
+      m.appendChild(stack(92));
     });
-    document.querySelectorAll('.desk-brand img').forEach(img=>{img.src=BRAND_SRC;img.alt='QUADRA + ROMAN';img.style.width='138px';img.style.height='52px';img.style.objectFit='contain';img.style.objectPosition='center';img.style.background='#fff';img.style.padding='3px 6px';img.style.borderRadius='8px';});
-    document.querySelectorAll('img.roman-logo,img[src*="roman-logo"],img[alt="ROMAN"],img[alt="Roman"]').forEach(img=>{img.src=BRAND_SRC;img.alt='QUADRA + ROMAN';img.style.objectFit='contain';img.style.objectPosition='center';});
+    document.querySelectorAll('.desk-brand').forEach(b=>{
+      b.querySelectorAll('img,.brand-stack-v94').forEach(x=>x.remove());
+      b.insertBefore(stack(145),b.firstChild);
+    });
+    document.querySelectorAll('img.roman-logo,img[src*="roman-logo"],img[alt="ROMAN"],img[alt="Roman"]').forEach(img=>{
+      const s=stack(img.closest('.desk-brand')?145:92);img.replaceWith(s);
+    });
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
   [250,700,1500].forEach(ms=>window.setTimeout(apply,ms));
