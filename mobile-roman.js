@@ -1,16 +1,17 @@
-// WMS SLS — official QUADRA + ROMAN brand sync for mobile + desktop.
+// WMS SLS v93 — exact user-approved QUADRA + ROMAN branding for mobile + desktop.
 (function syncQuadraRomanBrand(){
-  const BRAND_SRC='quadra-roman-logo.svg?v=20260911';
+  const BRAND_SRC='quadra-roman-logo.svg?v=20260914-2045';
   function apply(){
     document.querySelectorAll('.mark').forEach(m=>{
-      m.textContent='';m.style.background='#fff';m.style.padding='3px';m.style.width='72px';m.style.height='44px';m.style.borderRadius='8px';
-      const img=document.createElement('img');img.src=BRAND_SRC;img.alt='QUADRA ROMAN';img.style.width='100%';img.style.height='100%';img.style.objectFit='contain';m.appendChild(img);
+      m.textContent='';
+      m.style.background='#fff';m.style.padding='3px 6px';m.style.width='92px';m.style.height='44px';m.style.borderRadius='8px';m.style.overflow='hidden';
+      const img=document.createElement('img');img.src=BRAND_SRC;img.alt='QUADRA + ROMAN';img.style.width='100%';img.style.height='100%';img.style.objectFit='contain';img.style.objectPosition='center';m.appendChild(img);
     });
-    document.querySelectorAll('.desk-brand img').forEach(img=>{img.src=BRAND_SRC;img.alt='QUADRA ROMAN';img.style.width='108px';img.style.height='62px';img.style.objectFit='contain';img.style.background='#fff';img.style.padding='4px';});
-    document.querySelectorAll('img.roman-logo,img[src*="roman-logo"],img[alt="ROMAN"],img[alt="Roman"]').forEach(img=>{img.src=BRAND_SRC;img.alt='QUADRA ROMAN';img.style.objectFit='contain';});
+    document.querySelectorAll('.desk-brand img').forEach(img=>{img.src=BRAND_SRC;img.alt='QUADRA + ROMAN';img.style.width='138px';img.style.height='52px';img.style.objectFit='contain';img.style.objectPosition='center';img.style.background='#fff';img.style.padding='3px 6px';img.style.borderRadius='8px';});
+    document.querySelectorAll('img.roman-logo,img[src*="roman-logo"],img[alt="ROMAN"],img[alt="Roman"]').forEach(img=>{img.src=BRAND_SRC;img.alt='QUADRA + ROMAN';img.style.objectFit='contain';img.style.objectPosition='center';});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
-  window.setTimeout(apply,600);
+  [250,700,1500].forEach(ms=>window.setTimeout(apply,ms));
 })();
 
 // WMS patch chain. v98 removes size/quota/zoning from operational flow.
