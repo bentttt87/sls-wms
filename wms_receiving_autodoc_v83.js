@@ -162,8 +162,6 @@
         const rows=parsed.rows;
         const qty=rows.reduce((a,r)=>a+Number(r.qty||0),0);
         const mats=[...new Set(rows.map(r=>String(r.material||'').trim().toUpperCase()).filter(Boolean))];
-        const classified=typeof getMaterialSizeCategory==='function'?mats.filter(m=>!!getMaterialSizeCategory(m)):[];
-        const unclassified=typeof getMaterialSizeCategory==='function'?mats.filter(m=>!getMaterialSizeCategory(m)):[];
         const invalid=rows.filter(r=>!r.material||!Number.isFinite(Number(r.qty))||Number(r.qty)<=0);
         PU_RECV_ROWS={filename:file.name,rows,docNumber:parsed.docNumber,docType:parsed.docType,fiscalYear:parsed.fiscalYear};
         const ref=document.getElementById('puRecvRef'); if(ref) ref.value=parsed.docNumber;
@@ -178,7 +176,7 @@
             <div class="kpi"><div class="lbl">Baris</div><div class="val">${typeof fmt==='function'?fmt(rows.length):rows.length}</div></div>
             <div class="kpi"><div class="lbl">Qty</div><div class="val">${typeof fmt==='function'?fmt(qty):qty}<small> box</small></div></div>
             <div class="kpi"><div class="lbl">Material</div><div class="val">${typeof fmt==='function'?fmt(mats.length):mats.length}</div></div>
-            <div class="kpi ${unclassified.length?'alert':''}"><div class="lbl">Belum Kategori</div><div class="val">${typeof fmt==='function'?fmt(unclassified.length):unclassified.length}</div></div>
+            <div class="kpi"><div class="lbl">Status</div><div class="val" style="font-size:18px;color:var(--ok)">SIAP</div></div>
           </div>
           ${invalid.length?`<div class="denied" style="margin-top:10px">Ada ${invalid.length} baris tidak valid. Perbaiki Material/Qty sebelum dikonfirmasi.</div>`:''}
           <button class="btn brand" id="puRecvImport" style="margin-top:10px" ${invalid.length?'disabled':''}>✓ Konfirmasi Penerimaan</button>
@@ -216,7 +214,6 @@
       out.innerHTML=`<div class="card" style="border-color:#BFE3CD;background:var(--ok-bg);margin:0"><div style="font-size:22px">✅</div><div style="font-weight:750;color:var(--ok)">${typeof fmt==='function'?fmt(r.qty):r.qty} box penerimaan SAP berhasil masuk.</div><div style="font:700 13px var(--mono);margin-top:5px">${r.doc_type||'GR'} · ${r.reference||ref}</div><div class="muted" style="font-size:12px;margin-top:5px">Nomor dokumen dibaca otomatis dari file. Stock sekarang berada di Belum Ada Lokasi dan siap dilanjutkan Putaway.</div><button class="btn ghost" style="margin-top:9px" onclick="go('unloc')">Lihat Stock Belum Ada Lokasi</button></div>`;
       PU_RECV_ROWS=null;
       const hidden=document.getElementById('puRecvRef'); if(hidden)hidden.value='';
-      if(typeof refreshZoneCache==='function') await refreshZoneCache().catch(()=>{});
       if(typeof loadHome==='function') loadHome();
     }catch(e){
       b.disabled=false; b.textContent='✓ Konfirmasi Penerimaan';
