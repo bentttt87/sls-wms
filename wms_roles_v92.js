@@ -1,4 +1,4 @@
-// WMS SLS v94 — authoritative account model: MASTER, SUPERVISOR, ADMIN, STAFF, MANAGEMENT (national view only).
+// WMS SLS v97 — authoritative account model: MASTER, SUPERVISOR, ADMIN, STAFF, MANAGEMENT (national view only).
 (function(){
   'use strict';
 
@@ -29,14 +29,14 @@
       ]);
     }
 
-    if(typeof normalizeRole==='function' && !normalizeRole.__wmsV94){
+    if(typeof normalizeRole==='function' && !normalizeRole.__wmsV97){
       const base=normalizeRole;
       const fn=function(r){
         const x=String(r||'').toLowerCase().trim();
         if(['master','supervisor','admin','staff','management'].includes(x)) return x;
         return base(r);
       };
-      fn.__wmsV94=true;
+      fn.__wmsV97=true;
       normalizeRole=fn;
     }
 
@@ -46,6 +46,27 @@
 
   function isManagement(){
     try{return String(EFFECTIVE_ROLE||ROLE||'').toLowerCase()==='management';}catch(_e){return false;}
+  }
+
+  // Base setupRdc treats every non-empty scope as one fixed RDC. MANAGEMENT.SLS has
+  // scope "ALL RDC", so without this wrapper it would query a fake RDC named ALL RDC
+  // and show zero data. For Management, force national selector mode instead.
+  function patchManagementRdcSelector(){
+    if(typeof setupRdc!=='function' || setupRdc.__wmsV97) return;
+    const base=setupRdc;
+    const fn=async function(){
+      if(isManagement()){
+        try{ SCOPE=null; }catch(_e){}
+      }
+      const out=await base.apply(this,arguments);
+      if(isManagement()){
+        const wrap=document.getElementById('rdcPickWrap');
+        if(wrap) wrap.style.display='block';
+      }
+      return out;
+    };
+    fn.__wmsV97=true;
+    setupRdc=fn;
   }
 
   function applyManagementView(){
@@ -68,13 +89,13 @@
   }
 
   function patchNavigation(){
-    if(typeof go!=='function' || go.__wmsV94) return;
+    if(typeof go!=='function' || go.__wmsV97) return;
     const base=go;
     const fn=function(s){
       if(isManagement() && !['home','stock'].includes(String(s))) return base('home');
       return base(s);
     };
-    fn.__wmsV94=true;
+    fn.__wmsV97=true;
     go=fn;
   }
 
@@ -91,6 +112,7 @@
 
   function apply(){
     patchRoleModel();
+    patchManagementRdcSelector();
     patchNavigation();
     applyManagementView();
     cleanManagerWording();
