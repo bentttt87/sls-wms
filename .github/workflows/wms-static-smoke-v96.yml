@@ -1,0 +1,52 @@
+name: WMS v96 static smoke
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check external JavaScript syntax
+        run: |
+          for f in *.js; do
+            echo "Checking $f"
+            node --check "$f"
+          done
+      - name: Check inline JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile
+          s=Path('index.html').read_text(encoding='utf-8')
+          blocks=[]
+          for m in re.finditer(r'<script(?P<attrs>[^>]*)>(?P<body>.*?)</script>',s,re.I|re.S):
+              attrs=m.group('attrs') or ''
+              body=m.group('body') or ''
+              if 'src=' in attrs.lower() or not body.strip():
+                  continue
+              blocks.append(body)
+          for i,body in enumerate(blocks,1):
+              p=Path('/tmp')/f'wms_inline_{i}.js'
+              p.write_text(body,encoding='utf-8')
+              subprocess.run(['node','--check',str(p)],check=True)
+          print('inline script blocks checked:',len(blocks))
+          PY
+      - name: Check retired quota UI and critical loaders
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          idx=Path('index.html').read_text(encoding='utf-8')
+          loader=Path('mobile-roman.js').read_text(encoding='utf-8')
+          roles=Path('wms_roles_v92.js').read_text(encoding='utf-8')
+          assert 'Perlu perhatian kuota ukuran' not in idx
+          assert '>Kuota Ukuran<' not in idx
+          assert 'mobile-roman.js?v=' in idx
+          assert 'wms_roles_v92.js?v=' in loader
+          assert 'MANAGEMENT.SLS' in roles
+          assert 'MutationObserver' not in roles
+          print('critical static anchors OK')
+          PY
