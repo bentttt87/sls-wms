@@ -1,0 +1,36 @@
+name: WMS v97 cache bust
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Force WMS v97 loader
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s2,n=re.subn(r'mobile-roman\.js\?v=[^"\']+','mobile-roman.js?v=20260914b',s)
+          if n<1: raise SystemExit('mobile loader anchor not found')
+          p.write_text(s2,encoding='utf-8')
+          print('cache bust anchors:',n)
+          PY
+          node --check mobile-roman.js
+          node --check wms_roles_v92.js
+      - name: Commit cache key
+        run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Force-load WMS v97 management selector"
+          git push
