@@ -37,7 +37,7 @@
   window.setTimeout(apply,600);
 })();
 
-// WMS patch chain: governance -> permissions -> SPV opening/location -> auto document detection -> receiving access -> location detail/capacity -> v89 logic cleanup -> v90 hard UI cleanup -> v93 account roles.
+// WMS patch chain: governance -> permissions -> SPV opening/location -> auto document detection -> receiving access -> location detail/capacity -> quota removal -> v97 account roles.
 (function loadWmsPatches(){
   const eco=document.createElement('script');
   eco.src='ecosystem_v72.js?v=20260909';
@@ -75,10 +75,10 @@
                   p90.src='wms_quota_cleanup_v90.js?v=20260912a';
                   p90.defer=false;
                   p90.onload=()=>{
-                    const p93=document.createElement('script');
-                    p93.src='wms_roles_v92.js?v=20260913b';
-                    p93.defer=false;
-                    document.head.appendChild(p93);
+                    const p97=document.createElement('script');
+                    p97.src='wms_roles_v92.js?v=20260914b';
+                    p97.defer=false;
+                    document.head.appendChild(p97);
                   };
                   document.head.appendChild(p90);
                 };
