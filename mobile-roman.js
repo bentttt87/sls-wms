@@ -28,7 +28,7 @@
   [250,700,1500].forEach(ms=>window.setTimeout(apply,ms));
 })();
 
-// WMS patch chain. v98 removes size/quota/zoning; v99 adds SAP PGI stock-out gate.
+// WMS patch chain. v98 retires size/quota/zoning; v100 makes SAP PGI the official Stock Out gate.
 (function loadWmsPatches(){
   const eco=document.createElement('script');eco.src='ecosystem_v72.js?v=20260909';eco.defer=false;
   eco.onload=()=>{
@@ -50,7 +50,7 @@
                   clean.onload=()=>{
                     const role=document.createElement('script');role.src='wms_roles_v92.js?v=20260914b';role.defer=false;
                     role.onload=()=>{
-                      const pgi=document.createElement('script');pgi.src='wms_pgi_v99.js?v=20260915a';pgi.defer=false;document.head.appendChild(pgi);
+                      const pgi=document.createElement('script');pgi.src='wms_pgi_v100.js?v=20260915b';pgi.defer=false;document.head.appendChild(pgi);
                     };
                     document.head.appendChild(role);
                   };
