@@ -29,6 +29,7 @@
 })();
 
 // WMS patch chain. v98 retires size/quota/zoning; v100 makes SAP PGI the official Stock Out gate.
+// v108 adds the operational dashboard / breakage-risk early warning inside WMS (not Control Tower).
 (function loadWmsPatches(){
   const eco=document.createElement('script');eco.src='ecosystem_v72.js?v=20260909';eco.defer=false;
   eco.onload=()=>{
@@ -50,7 +51,11 @@
                   clean.onload=()=>{
                     const role=document.createElement('script');role.src='wms_roles_v92.js?v=20260914b';role.defer=false;
                     role.onload=()=>{
-                      const pgi=document.createElement('script');pgi.src='wms_pgi_v100.js?v=20260915b';pgi.defer=false;document.head.appendChild(pgi);
+                      const pgi=document.createElement('script');pgi.src='wms_pgi_v100.js?v=20260915b';pgi.defer=false;
+                      pgi.onload=()=>{
+                        const dash=document.createElement('script');dash.src='wms_dashboard_v108.js?v=20260916a';dash.defer=false;document.head.appendChild(dash);
+                      };
+                      document.head.appendChild(pgi);
                     };
                     document.head.appendChild(role);
                   };
