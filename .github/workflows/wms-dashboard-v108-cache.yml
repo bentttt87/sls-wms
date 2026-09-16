@@ -1,0 +1,41 @@
+name: WMS Dashboard v108 cache bust
+on:
+  push:
+    paths:
+      - '.github/workflows/wms-dashboard-v108-cache.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Load WMS operational dashboard v108
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          s,n=re.subn(r'mobile-roman\.js\?v=[^"\']+','mobile-roman.js?v=20260916-dashboard108',s)
+          if n<1:
+              raise SystemExit('mobile-roman loader not found')
+          p.write_text(s,encoding='utf-8')
+          print('updated',n)
+          PY
+      - name: Smoke test
+        run: |
+          node --check mobile-roman.js
+          node --check wms_dashboard_v108.js
+          grep -q 'mobile-roman.js?v=20260916-dashboard108' index.html
+      - name: Commit production index
+        run: |
+          if git diff --quiet -- index.html; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Load WMS dashboard v108'
+          git push
