@@ -982,7 +982,9 @@ const ROLE_PERMS={
 };
 function normalizeRole(r){
   const x=String(r||'').toLowerCase().trim();
-  if(x==='master'||x==='super_admin'||x==='admin') return 'master';
+  if(x==='master'||x==='super_admin') return 'master';
+  if(x==='management') return 'viewer'; // management has global read-only, never operation privileges
+  if(x==='admin') return 'rdc_manager'; // Admin RDC must not map to Master in WMS
   if(['rdc_manager','manager','head_rdc','head','rdc-head'].includes(x)) return 'rdc_manager';
   if(['supervisor','spv','warehouse_supervisor'].includes(x)) return 'supervisor';
   if(['operator','pelaksana','staff','warehouse_staff'].includes(x)) return 'operator';
@@ -1048,32 +1050,45 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 document.getElementById('loginBtn').addEventListener('click',doLogin);
 document.getElementById('uid').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('pw').focus();});
 document.getElementById('pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-function loginIdentity(uid){
-  const x=uid.toLowerCase();
-  if(x==='master'||x==='wms.master') return {email:'master@sls.internal',role:'master',rdc:null};
-  const m=x.match(/^wms\.(jkt|smg|sby|dps|plb)\.(mgr|spv|ops|view)$/);
-  if(!m) return null;
-  const rdcMap={jkt:'Jakarta',smg:'Semarang',sby:'Surabaya',dps:'Denpasar',plb:'Palembang'};
-  const roleMap={mgr:'rdc_manager',spv:'supervisor',ops:'operator',view:'viewer'};
-  return {email:x+'@sls.internal',role:roleMap[m[2]],rdc:rdcMap[m[1]]};
+// Resolve identity from Supabase canonical alias, never infer role from typed Login ID.
+async function loginIdentity(uid,pw){
+  const x=String(uid||'').trim().toLowerCase();
+  if(!x||!pw)return null;
+  const r=await fetch(`${SB}/rest/v1/rpc/get_login_email`,{
+    method:'POST',headers:{apikey:ANON,Authorization:'Bearer '+ANON,'Content-Type':'application/json'},
+    body:JSON.stringify({input_username:x,input_password:pw})
+  });
+  if(!r.ok)throw new Error('Gagal memvalidasi ID SLS');
+  const email=await r.json();
+  return typeof email==='string'&&email.includes('@')?email:null;
 }
 async function doLogin(){
   const uid=document.getElementById('uid').value.trim().toLowerCase();
   const pw=document.getElementById('pw').value;
   const msg=document.getElementById('loginMsg');
   if(!uid||!pw){msg.textContent='User ID dan password wajib diisi.';return;}
-  const ident=loginIdentity(uid);
-  if(!ident){msg.textContent='Format User ID tidak dikenali.';msg.style.color='var(--stop)';return;}
-  msg.textContent='Membuat sesi aman…'; msg.style.color='var(--muted)';
+  msg.textContent='Memvalidasi ID SLS…'; msg.style.color='var(--muted)';
   try{
+    const email=await loginIdentity(uid,pw);
+    if(!email){msg.textContent='User ID tidak aktif atau tidak ditemukan.';msg.style.color='var(--stop)';return}
     const r=await fetch(`${SB}/auth/v1/token?grant_type=password`,{method:'POST',
-      headers:{'apikey':ANON,'Content-Type':'application/json'},body:JSON.stringify({email:ident.email,password:pw})});
+      headers:{apikey:ANON,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
     if(!r.ok){
       msg.textContent='User ID atau password salah / akun belum aktif.';msg.style.color='var(--stop)';
       return;
     }
     const auth=await r.json(); TOKEN=auth.access_token;
-    ROLE=ident.role; EFFECTIVE_ROLE=normalizeRole(ROLE); SCOPE=ident.rdc;
+    // Authorization is from the active Supabase user_roles mapping, not a string inferred from uid.
+    const accessResponse=await fetch(`${SB}/rest/v1/rpc/wms_my_access`,{
+      method:'POST',headers:hdr(),body:'{}'
+    });
+    if(!accessResponse.ok){TOKEN=null;throw new Error('Akses WMS tidak dapat diverifikasi.')}
+    const access=await accessResponse.json();
+    if(!access?.role){TOKEN=null;throw new Error('Akun tidak aktif atau belum memiliki role SLS.')}
+    ROLE=access.role;
+    EFFECTIVE_ROLE=normalizeRole(ROLE);
+    SCOPE=access.role==='master'||access.role==='management'?null:access.rdc_name;
+    if(!['master','management'].includes(ROLE)&&!SCOPE){TOKEN=null;throw new Error('Scope RDC pada akun ini belum ditentukan.')}
     document.getElementById('loginView').style.display='none';
     document.getElementById('appView').style.display='block';
     document.getElementById('whoRole').textContent = ROLE_LABELS[EFFECTIVE_ROLE]||EFFECTIVE_ROLE.toUpperCase();
